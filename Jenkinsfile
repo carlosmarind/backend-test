@@ -1,5 +1,3 @@
-# 1) Crea un Jenkinsfile mínimo (solo para probar)
-@'
 pipeline {
   agent any
   stages {
