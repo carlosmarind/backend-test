@@ -1,28 +1,26 @@
-# Base Jenkins LTS
 FROM jenkins/jenkins:lts
-
-# Variables de entorno
-ENV JENKINS_USER=gdiaz
-ENV JENKINS_PASS=admin123.
+ 
+ENV JENKINS_USER=jenkins
+ENV JENKINS_PASS=4a7197cf94ca4492b1d4cec0ff2cada9
 ENV JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-
-# Instalar Docker dentro del contenedor
+ 
+COPY plugins.txt /usr/share/jenkins/plugins.txt
+RUN jenkins-plugin-cli -f /usr/share/jenkins/plugins.txt
+ 
 USER root
-
+ 
 RUN apt-get update && apt-get install -y \
-    ca-certificates curl gnupg lsb-release sudo \
-  && mkdir -m 0755 -p /etc/apt/keyrings \
-  && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
-  && chmod a+r /etc/apt/keyrings/docker.asc \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" \
-     | tee /etc/apt/sources.list.d/docker.list > /dev/null \
-  && apt-get update \
-  && apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin \
-  && apt-get clean
-
-# Permitir que el usuario jenkins use Docker
-RUN groupadd -g 999 docker || true \
-  && usermod -aG docker jenkins
-
-# Cambiar a jenkins
+    ca-certificates curl gnupg lsb-release sudo bash \
+ && install -m 0755 -d /etc/apt/keyrings \
+ && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker-archive-keyring.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
+    | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+ && apt-get update \
+ && apt-get install -y docker-ce-cli docker-compose \
+ && apt-get clean
+ 
+RUN groupadd docker || true \
+    && usermod -aG docker jenkins
+ 
 USER jenkins
+WORKDIR /var/jenkins_home
