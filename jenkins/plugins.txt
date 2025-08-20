@@ -1,6 +1,5 @@
+docker-plugin
 workflow-aggregator
-branch-api
 git
-git-client
-docker-workflow
 blueocean
+credentials-binding
