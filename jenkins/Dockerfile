@@ -1,7 +1,7 @@
 FROM jenkins/jenkins:lts
  
-ENV JENKINS_USER=jenkins
-ENV JENKINS_PASS=4a7197cf94ca4492b1d4cec0ff2cada9
+ENV JENKINS_USER=gdiaz
+ENV JENKINS_PASS=admin123.
 ENV JAVA_OPTS=-Djenkins.install.runSetupWizard=false
  
 COPY plugins.txt /usr/share/jenkins/plugins.txt
