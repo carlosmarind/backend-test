@@ -1,4 +1,5 @@
 version: '3.9'
+
 services:
   app:
     build:
@@ -9,32 +10,33 @@ services:
       - "3000:3000"
     networks:
       - devnet
- 
+
   jenkins:
     build:
-      context: ../jenkins
+      context: ./jenkins     # Ajusta si tu Dockerfile está en otra carpeta
       dockerfile: Dockerfile
+    container_name: jenkins
     restart: always
     ports:
       - "8080:8080"
     volumes:
-      - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock  # acceso al Docker del host
+      - jenkins_home:/var/jenkins_home   # Datos persistentes
+      - /var/run/docker.sock:/var/run/docker.sock  # Permite a Jenkins usar Docker del host
     networks:
       - devnet
- 
+
   nexus:
     image: sonatype/nexus3
     container_name: nexus_repo
-    volumes:
-      - nexus-data:/nexus-data
     ports:
       - "8081:8081"
       - "8082:8082"
       - "8083:8083"
+    volumes:
+      - nexus-data:/nexus-data
     networks:
       - devnet
- 
+
   sonarqube:
     image: sonarqube:lts-community
     container_name: sonarqube
@@ -48,7 +50,7 @@ services:
       - db_sonar
     networks:
       - devnet
- 
+
   db_sonar:
     image: postgres:15
     container_name: db_sonar
@@ -56,18 +58,16 @@ services:
       - POSTGRES_USER=sonar
       - POSTGRES_PASSWORD=sonar
       - POSTGRES_DB=sonar
+    volumes:
+      - postgresql:/var/lib/postgresql/data
     networks:
       - devnet
-    volumes:
-      - postgresql:/var/lib/postgresql
-      - postgresql_data:/var/lib/postgresql/data
- 
+
 networks:
   devnet:
     driver: bridge
- 
+
 volumes:
   jenkins_home:
   nexus-data:
   postgresql:
-  postgresql_data:
