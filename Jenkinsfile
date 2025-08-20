@@ -1,6 +1,6 @@
 pipeline {
   agent any
-  options { timestamps(); ansiColor('xterm') }
+  options { timestamps() }   // <-- quitamos ansiColor
   environment {
     REGISTRY_URL      = "host.docker.internal:8082"
     IMAGE_NAME        = "labo3/backend-test"
@@ -11,7 +11,7 @@ pipeline {
     CONTAINER_NAME    = "backend"
     KUBECONFIG_ID     = "cred-kubeconfig-file"
   }
-  tools { nodejs "Node18" }
+  tools { nodejs "NodeJS" }  // <-- usa el nombre real de tu instalación
 
   stages {
     stage('Checkout'){ steps { checkout scm } }
