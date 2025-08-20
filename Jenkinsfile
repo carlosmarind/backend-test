@@ -56,17 +56,17 @@ pipeline {
     }
 
     stage('Docker Push'){
-      steps {
-        script {
-          docker.withRegistry("http://${REGISTRY_URL}", "${NEXUS_CREDS_ID}") {
-            sh """
-              docker push ${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
-              docker push ${REGISTRY_URL}/${IMAGE_NAME}:latest
-            """
-          }
-        }
+    steps {
+      withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+        sh """
+          echo "\$DOCKER_PASS" | docker login http://${REGISTRY_URL} -u "\$DOCKER_USER" --password-stdin
+          docker push ${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
+          docker push ${REGISTRY_URL}/${IMAGE_NAME}:latest
+          docker logout http://${REGISTRY_URL} || true
+        """
       }
     }
+  }
 
     stage('Kubernetes Deploy'){
       steps {
