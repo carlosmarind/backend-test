@@ -1,6 +1,9 @@
 version: '3.9'
 
 services:
+  # ----------------------------
+  # Aplicación Node.js
+  # ----------------------------
   app:
     build:
       context: ..
@@ -11,20 +14,27 @@ services:
     networks:
       - devnet
 
+  # ----------------------------
+  # Jenkins con Docker CLI
+  # ----------------------------
   jenkins:
     build:
-      context: ./jenkins     # Ajusta si tu Dockerfile está en otra carpeta
+      context: ./jenkins
       dockerfile: Dockerfile
     container_name: jenkins
+    user: root   # para acceso al docker.sock
     restart: always
     ports:
       - "8080:8080"
     volumes:
-      - jenkins_home:/var/jenkins_home   # Datos persistentes
-      - /var/run/docker.sock:/var/run/docker.sock  # Permite a Jenkins usar Docker del host
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - devnet
 
+  # ----------------------------
+  # Nexus Repository
+  # ----------------------------
   nexus:
     image: sonatype/nexus3
     container_name: nexus_repo
@@ -37,6 +47,9 @@ services:
     networks:
       - devnet
 
+  # ----------------------------
+  # SonarQube
+  # ----------------------------
   sonarqube:
     image: sonarqube:lts-community
     container_name: sonarqube
@@ -51,6 +64,9 @@ services:
     networks:
       - devnet
 
+  # ----------------------------
+  # Base de datos de SonarQube
+  # ----------------------------
   db_sonar:
     image: postgres:15
     container_name: db_sonar
@@ -63,10 +79,16 @@ services:
     networks:
       - devnet
 
+# ----------------------------
+# Red personalizada
+# ----------------------------
 networks:
   devnet:
     driver: bridge
 
+# ----------------------------
+# Volúmenes persistentes
+# ----------------------------
 volumes:
   jenkins_home:
   nexus-data:
