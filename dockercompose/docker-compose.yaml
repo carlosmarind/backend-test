@@ -15,6 +15,7 @@ services:
       context: ../jenkins
       dockerfile: Dockerfile
     restart: always
+    user: root
     ports:
       - "8080:8080"
     volumes:
