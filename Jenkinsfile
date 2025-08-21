@@ -26,9 +26,9 @@ pipeline {
       steps {
         script {
           docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-            sh 'docker build -t mi-app-nest:gdd .'
-            sh 'docker tag mi-app-nest:gdd gdiaz90/mi-app-nest:gdd'
-            sh 'docker push gdiaz90/mi-app-nest:gdd'
+            sh 'docker build -t backend-test:gdd .'
+            sh 'docker tag backend-test:gdd gdiaz90/backend-test:gdd'
+            sh 'docker push gdiaz90/backend-test:gdd'
           }
         }
       }
