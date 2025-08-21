@@ -1,12 +1,10 @@
 pipeline {
   agent any
 
-  options {
-    timestamps()
-  }
+  options { timestamps() }
 
   tools {
-    nodejs 'Node20'  // Configurado en Manage Jenkins → Global Tool Configuration
+    nodejs 'Node20'        // Configurado en Global Tool Configuration
   }
 
   environment {
@@ -35,22 +33,17 @@ pipeline {
     }
 
     stage('Testing + Coverage') {
-      steps {
-        sh 'npm test -- --coverage'
-        // Debe producir coverage/lcov.info para SonarQube
-      }
+      steps { sh 'npm test -- --coverage' }
     }
 
     stage('Build app') {
-      steps {
-        sh 'npm run build || echo "ajusta el build si tu app no usa npm"'
-      }
+      steps { sh 'npm run build || echo "ajusta el build si tu app no usa npm"' }
     }
 
     stage('SonarQube Scan') {
       steps {
         script {
-          def scannerHome = tool 'SonarScanner'  // Definido en Global Tool Configuration
+          def scannerHome = tool 'SonarScanner'  // Defínelo en Global Tool Configuration
           withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
             withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
               sh """
@@ -80,3 +73,43 @@ pipeline {
       steps {
         sh """
           docker build \
+            -t ${REGISTRY}/${IMAGE_NAME}:latest \
+            -t ${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER} .
+        """
+      }
+    }
+
+    stage('Push to Nexus') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'nexus-docker', passwordVariable: 'NEXUS_PWD', usernameVariable: 'NEXUS_USER')]) {
+          sh 'echo "$NEXUS_PWD" | docker login ' + "${env.REGISTRY}" + ' -u "$NEXUS_USER" --password-stdin'
+        }
+        sh """
+          docker push ${REGISTRY}/${IMAGE_NAME}:latest
+          docker push ${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}
+        """
+      }
+    }
+
+    stage('Deploy to K8s') {
+      steps {
+        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+          sh '''
+            export KUBECONFIG="$KUBECONFIG_FILE"
+            kubectl apply -f kubernetes.yaml
+            kubectl set image deployment/backend-test backend='"${REGISTRY}/${IMAGE_NAME}:latest"' -n default
+            kubectl rollout status deployment/backend-test -n default
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker logout ${REGISTRY} || true'
+      junit allowEmptyResults: true, testResults: 'junit-report*.xml'
+      archiveArtifacts artifacts: 'coverage/**/*, build/**/*', allowEmptyArchive: true
+    }
+  }
+}
