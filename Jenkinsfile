@@ -109,49 +109,20 @@ stage('Deploy to K8s') {
     withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
       sh '''
         set -e
+        export KUBECONFIG="$KUBECONFIG_FILE"
 
-        # 0) Trabajamos con una copia local del kubeconfig
-        cp "$KUBECONFIG_FILE" kubeconfig.patched
+        # Sanity check: si no conecta, aborta aquí.
+        kubectl cluster-info
+        kubectl get ns | head -5
 
-        CTX=$(kubectl --kubeconfig kubeconfig.patched config current-context || true)
-        if [ -z "$CTX" ]; then
-          echo "No hay current-context en el kubeconfig. Aborta."
-          exit 1
-        fi
-        CLUSTER=$(kubectl --kubeconfig kubeconfig.patched config view -o jsonpath='{.contexts[?(@.name=="'"$CTX"'")].context.cluster}')
-
-        # 1) Intento 1: kubernetes.docker.internal:6443 (Docker Desktop)
-        kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --server="https://kubernetes.docker.internal:6443" >/dev/null
-        if kubectl --kubeconfig kubeconfig.patched --request-timeout=5s version >/dev/null 2>&1; then
-          echo "Usando https://kubernetes.docker.internal:6443"
-        else
-          # 2) Intento 2: host.docker.internal:6443
-          kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --server="https://host.docker.internal:6443" >/dev/null
-          if kubectl --kubeconfig kubeconfig.patched --request-timeout=5s version >/dev/null 2>&1; then
-            echo "Usando https://host.docker.internal:6443"
-          else
-            # 3) Último recurso: ignorar verificación TLS (solo para laboratorio)
-            echo "No fue posible conectar con TLS válido. Activando insecure-skip-tls-verify (SOLO LAB)."
-            kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --insecure-skip-tls-verify=true >/dev/null
-          fi
-        fi
-
-        export KUBECONFIG="$PWD/kubeconfig.patched"
-
-        # Diagnóstico rápido (no fallar si el servidor limita el endpoint)
-        kubectl cluster-info || true
-        kubectl version --client=true
-
-        # Despliegue (sin validación OpenAPI)
         kubectl apply -f kubernetes.yaml --validate=false
-
-        # Actualizar imagen y esperar rollout
         kubectl set image deployment/backend-test backend='"${REGISTRY}/${IMAGE_NAME}:latest"' -n default
         kubectl rollout status deployment/backend-test -n default
       '''
     }
   }
 }
+
 
 
   }
