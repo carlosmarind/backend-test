@@ -6,6 +6,11 @@ pipeline {
             reuseNode true
         }
     }
+ 
+    environment {
+        IMAGE_NAME = "gdiaz90/backend-test"
+    }
+ 
     stages {
         stage('Instalación de dependencias..') {
             steps { sh 'npm install' }
