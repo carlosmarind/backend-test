@@ -4,7 +4,8 @@ import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const port = process.env.PORT ?? 3000;           // usa 3000 por defecto
-  await app.listen(port, '0.0.0.0');               // 👈 importante: todas las interfaces
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port, '0.0.0.0'); // 👈 importante
+  console.log(`[bootstrap] Listening on http://0.0.0.0:${port}`);
 }
 bootstrap();
