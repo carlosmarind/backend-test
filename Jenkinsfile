@@ -32,7 +32,7 @@ pipeline {
                         app.push()          
                         app.push("ebl")  
                     }
-                },
+                }
                 script {
                     docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} localhost:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
