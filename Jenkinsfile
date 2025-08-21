@@ -1,97 +1,91 @@
 pipeline {
   agent any
-  options { timestamps() }   // <-- quitamos ansiColor
+
   environment {
-    REGISTRY_URL      = "host.docker.internal:8082"
-    IMAGE_NAME        = "labo3/backend-test"
-    NEXUS_CREDS_ID    = "cred-nexus-docker"
-    SONAR_SERVER_NAME = "SonarQubeServer"
-    K8S_NAMESPACE     = "default"
-    DEPLOYMENT_NAME   = "backend-test"
-    CONTAINER_NAME    = "backend"
-    KUBECONFIG_ID     = "cred-kubeconfig-file"
+    SONARQUBE_SERVER = 'SonarServer'
+    SONAR_PROJECT_KEY = 'backend-test-mauricio'
+    REGISTRY = 'host.docker.internal:8082'
+    IMAGE_NAME = 'labo3/backend-test'
   }
-  tools { nodejs "NodeJS" }  // <-- usa el nombre real de tu instalación
 
   stages {
-    stage('Checkout'){ steps { checkout scm } }
-
-    stage('Install dependencies'){ steps { sh 'npm ci' } }
-
-    stage('Testing'){
-      steps { sh 'npm run test:cov || npm test || true' }
-      post { always { junit allowEmptyResults: true, testResults: 'reports/junit/*.xml' } }
+    stage('Checkout') {
+      steps { checkout scm }
     }
 
-    stage('Build'){ steps { sh 'npm run build' } }
-
-    stage('SonarQube Analysis'){
+    stage('Install deps') {
       steps {
-        withSonarQubeEnv("${SONAR_SERVER_NAME}") {
-          sh 'npx sonar-scanner'
-        }
+        sh '''
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+        '''
       }
     }
 
-    stage('Quality Gate'){
+    stage('Testing + Coverage') {
+      steps { sh 'npm test -- --coverage' }
+    }
+
+    stage('Build app') {
+      steps { sh 'npm run build || echo "ajusta el build si tu app no usa npm"' }
+    }
+
+    stage('SonarQube Scan') {
       steps {
-        timeout(time: 10, unit: 'MINUTES') {
-          script {
-            def qg = waitForQualityGate()
-            if (qg.status != 'OK') { error "Quality Gate: ${qg.status}" }
+        withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
+          withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+            sh """
+              sonar-scanner \
+                -Dsonar.login=$SONAR_TOKEN \
+                -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} \
+                -Dsonar.sources=src \
+                -Dsonar.tests=tests \
+                -Dsonar.test.inclusions=tests/**/*.test.js \
+                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            """
           }
         }
       }
     }
 
-    stage('Docker Build'){
+    stage('Quality Gate') {
       steps {
-        script { env.IMAGE_TAG = "${BUILD_NUMBER}" }
-        sh '''
-          docker build --pull \
-            -t ${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG} \
-            -t ${REGISTRY_URL}/${IMAGE_NAME}:latest .
-        '''
+        timeout(time: 15, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
+        }
       }
     }
 
-    stage('Docker Push'){
-  steps {
-    withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-      sh '''
-        set -eux
-        echo "$DOCKER_PASS" | docker login http://${REGISTRY_URL} -u "$DOCKER_USER" --password-stdin
-        docker version
-        docker images | grep "${IMAGE_NAME}" || true
-        # reintentos por si Nexus tarda en aceptar la capa latest
-        for i in 1 2 3; do
-          docker push ${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG} && break || sleep 3
-        done
-        for i in 1 2 3; do
-          docker push ${REGISTRY_URL}/${IMAGE_NAME}:latest && break || sleep 3
-        done
-        docker logout http://${REGISTRY_URL} || true
-      '''
-    }
-  }
-}
-
-    stage('Kubernetes Deploy'){
+    stage('Build Docker image') {
       steps {
-        withCredentials([file(credentialsId: "${KUBECONFIG_ID}", variable: 'KUBECONFIG_FILE')]) {
+        sh """
+          docker build -t ${REGISTRY}/${IMAGE_NAME}:latest -t ${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER} .
+        """
+      }
+    }
+
+    stage('Push to Nexus') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'nexus-docker', passwordVariable: 'NEXUS_PWD', usernameVariable: 'NEXUS_USER')]) {
+          sh 'echo "$NEXUS_PWD" | docker login ' + "${env.REGISTRY}" + ' -u "$NEXUS_USER" --password-stdin'
+        }
+        sh """
+          docker push ${REGISTRY}/${IMAGE_NAME}:latest
+          docker push ${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}
+        """
+      }
+    }
+
+    stage('Deploy to K8s') {
+      steps {
+        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
           sh '''
-            export KUBECONFIG="${KUBECONFIG_FILE}"
-            kubectl -n ${K8S_NAMESPACE} set image deployment/${DEPLOYMENT_NAME} \
-              ${CONTAINER_NAME}=${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
-            kubectl -n ${K8S_NAMESPACE} rollout status deployment/${DEPLOYMENT_NAME} --timeout=300s
+            export KUBECONFIG="$KUBECONFIG_FILE"
+            kubectl apply -f kubernetes.yaml
+            kubectl set image deployment/backend-test backend=${REGISTRY}/${IMAGE_NAME}:latest -n default
+            kubectl rollout status deployment/backend-test -n default
           '''
         }
       }
     }
-  }
-
-  post {
-    success { echo "OK -> ${REGISTRY_URL}/${IMAGE_NAME}:${BUILD_NUMBER}" }
-    failure { echo "Pipeline falló. Revisa las etapas." }
   }
 }
