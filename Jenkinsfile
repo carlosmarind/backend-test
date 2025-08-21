@@ -2,13 +2,15 @@ pipeline {
   agent any
 
   options {
-    ansiColor('xterm')
+    // Reemplaza ansiColor('xterm') por wrap(...) para soportar tu versión de Jenkins
+    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'xterm'])
     timestamps()
   }
 
   tools {
-    // Definidos en Global Tool Configuration
-    nodejs 'Node20'
+    // Defínelos en Manage Jenkins → Global Tool Configuration
+    nodejs 'Node20'          // Node LTS (18/20) instalado automáticamente
+    // Para sonar-scanner usaremos tool() más abajo
   }
 
   environment {
@@ -39,7 +41,7 @@ pipeline {
     stage('Testing + Coverage') {
       steps {
         sh 'npm test -- --coverage'
-        // Asegúrate que genere coverage/lcov.info para Sonar
+        // Asegúrate de generar coverage/lcov.info para Sonar
       }
     }
 
@@ -52,7 +54,7 @@ pipeline {
     stage('SonarQube Scan') {
       steps {
         script {
-          // Toma el path del sonar-scanner instalado por Global Tools
+          // Toma el sonar-scanner configurado en Global Tools (Manage Jenkins)
           def scannerHome = tool 'SonarScanner'
           withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
             withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
