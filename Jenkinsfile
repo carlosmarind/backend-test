@@ -27,10 +27,16 @@ pipeline {
         stage('Empaquetado y push Docker') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials','') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
                         app.push()          
-                        app.push("latest")  
+                        app.push("ebl")  
+                    }
+                },
+                script {
+                    docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} localhost:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        sh "docker push localhost:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
                     }
                 }
             }
