@@ -4,8 +4,8 @@ pipeline {
   options { timestamps() }
 
   tools {
-    nodejs 'Node20'              // Global Tool: NodeJS
-    // SonarScanner lo tomamos con tool() dentro del stage
+    nodejs 'Node20'              // Global Tool: NodeJS (LTS 18/20)
+    // SonarScanner se obtiene con tool() dentro del stage
   }
 
   environment {
@@ -34,16 +34,10 @@ pipeline {
     }
 
     stage('Testing + Coverage') {
-      environment {
-        // Para generar JUnit (requiere npm i -D jest-junit)
-        JEST_JUNIT_OUTPUT = 'junit-report.xml'
-      }
+      environment { JEST_JUNIT_OUTPUT = 'junit-report.xml' } // requiere jest-junit (opcional)
       steps {
-        sh '''
-          # Si tienes jest-junit: añadimos el reporter JUnit
-          # Si no lo tienes aún, puedes dejar sólo: npm test -- --coverage
-          npm test -- --coverage --reporters=default --reporters=jest-junit || true
-        '''
+        // Si no tienes jest-junit aún, puedes dejar solo: npm test -- --coverage
+        sh 'npm test -- --coverage --reporters=default --reporters=jest-junit || true'
       }
     }
 
@@ -60,9 +54,10 @@ pipeline {
           withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
             withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
               sh """
+                export SONAR_TOKEN="$SONAR_TOKEN"
                 "${scannerHome}/bin/sonar-scanner" \
-                  -Dsonar.login=$SONAR_TOKEN \
-                  -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} \
+                  -Dsonar.host.url="$SONAR_HOST_URL" \
+                  -Dsonar.projectKey='${SONAR_PROJECT_KEY}' \
                   -Dsonar.sources=src \
                   -Dsonar.tests=src \
                   -Dsonar.test.inclusions=**/*.test.* \
@@ -76,16 +71,18 @@ pipeline {
 
     stage('Quality Gate') {
       steps {
-        timeout(time: 15, unit: 'MINUTES') {
+        timeout(time: 30, unit: 'MINUTES') {
           waitForQualityGate abortPipeline: true
         }
       }
     }
 
+    /* ---------- A partir de aquí quitamos el label 'docker' ---------- */
     stage('Build Docker image') {
-      agent { label 'docker' }  // Este nodo debe tener Docker
+      agent any
       steps {
         sh """
+          docker version
           docker build \
             -t ${REGISTRY}/${IMAGE_NAME}:latest \
             -t ${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER} .
@@ -94,7 +91,7 @@ pipeline {
     }
 
     stage('Push to Nexus') {
-      agent { label 'docker' }  // Este nodo debe tener Docker
+      agent any
       steps {
         withCredentials([usernamePassword(credentialsId: 'nexus-docker', passwordVariable: 'NEXUS_PWD', usernameVariable: 'NEXUS_USER')]) {
           sh 'echo "$NEXUS_PWD" | docker login ' + "${env.REGISTRY}" + ' -u "$NEXUS_USER" --password-stdin'
@@ -107,11 +104,12 @@ pipeline {
     }
 
     stage('Deploy to K8s') {
-      agent { label 'docker' }  // Este nodo debe tener kubectl (y acceso al cluster)
+      agent any
       steps {
         withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
           sh '''
             export KUBECONFIG="$KUBECONFIG_FILE"
+            kubectl version --client=true
             kubectl apply -f kubernetes.yaml
             kubectl set image deployment/backend-test backend='"${REGISTRY}/${IMAGE_NAME}:latest"' -n default
             kubectl rollout status deployment/backend-test -n default
@@ -123,9 +121,8 @@ pipeline {
 
   post {
     always {
-      // Evita fallo si no hay Docker en este nodo
+      // Evita fallo si docker no está disponible por cualquier motivo
       sh 'command -v docker >/dev/null 2>&1 && docker logout ${REGISTRY} || true'
-      // Recoge reportes JUnit si se generaron (jest-junit)
       junit allowEmptyResults: true, testResults: 'junit-report*.xml'
       archiveArtifacts artifacts: 'coverage/**/*, build/**/*', allowEmptyArchive: true
     }
