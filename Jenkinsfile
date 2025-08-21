@@ -56,17 +56,25 @@ pipeline {
     }
 
     stage('Docker Push'){
-    steps {
-      withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-        sh """
-          echo "\$DOCKER_PASS" | docker login http://${REGISTRY_URL} -u "\$DOCKER_USER" --password-stdin
-          docker push ${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
-          docker push ${REGISTRY_URL}/${IMAGE_NAME}:latest
-          docker logout http://${REGISTRY_URL} || true
-        """
-      }
+  steps {
+    withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+      sh '''
+        set -eux
+        echo "$DOCKER_PASS" | docker login http://${REGISTRY_URL} -u "$DOCKER_USER" --password-stdin
+        docker version
+        docker images | grep "${IMAGE_NAME}" || true
+        # reintentos por si Nexus tarda en aceptar la capa latest
+        for i in 1 2 3; do
+          docker push ${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG} && break || sleep 3
+        done
+        for i in 1 2 3; do
+          docker push ${REGISTRY_URL}/${IMAGE_NAME}:latest && break || sleep 3
+        done
+        docker logout http://${REGISTRY_URL} || true
+      '''
     }
   }
+}
 
     stage('Kubernetes Deploy'){
       steps {
