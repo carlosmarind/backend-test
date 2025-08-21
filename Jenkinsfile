@@ -27,7 +27,7 @@ pipeline {
         stage('Empaquetado y push Docker') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials','') {
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
                         app.push()          
                         app.push("ebl")  
