@@ -77,36 +77,18 @@ pipeline {
 }
 
     stage('Kubernetes Deploy'){
-  steps {
-    withCredentials([file(credentialsId: "${KUBECONFIG_ID}", variable: 'KUBECONFIG_FILE')]) {
-      sh '''
-        set -e
-        export KUBECONFIG="${KUBECONFIG_FILE}"
-
-        # Instala kubectl en el workspace si no está en PATH (sin sudo)
-        if ! command -v kubectl >/dev/null 2>&1; then
-          mkdir -p .bin
-          curl -sSLo .bin/kubectl "https://dl.k8s.io/release/$(curl -sSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x .bin/kubectl
-          export PATH="$PWD/.bin:$PATH"
-        else
-          echo "kubectl ya está disponible"
-        fi
-
-        # Verificación rápida
-        kubectl version --client
-        kubectl -n ${K8S_NAMESPACE} get deploy ${DEPLOYMENT_NAME} || true
-
-        # Actualiza imagen y espera rollout
-        kubectl -n ${K8S_NAMESPACE} set image deployment/${DEPLOYMENT_NAME} \
-          ${CONTAINER_NAME}=${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
-
-        kubectl -n ${K8S_NAMESPACE} rollout status deployment/${DEPLOYMENT_NAME} --timeout=300s
-      '''
+      steps {
+        withCredentials([file(credentialsId: "${KUBECONFIG_ID}", variable: 'KUBECONFIG_FILE')]) {
+          sh '''
+            export KUBECONFIG="${KUBECONFIG_FILE}"
+            kubectl -n ${K8S_NAMESPACE} set image deployment/${DEPLOYMENT_NAME} \
+              ${CONTAINER_NAME}=${REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
+            kubectl -n ${K8S_NAMESPACE} rollout status deployment/${DEPLOYMENT_NAME} --timeout=300s
+          '''
+        }
+      }
     }
   }
-}
-
 
   post {
     success { echo "OK -> ${REGISTRY_URL}/${IMAGE_NAME}:${BUILD_NUMBER}" }
