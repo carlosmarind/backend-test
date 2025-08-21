@@ -24,7 +24,7 @@ services:
       - devnet
     volumes:
       - jenkins_home:/var/jenkins_home   # 🔑 volumen administrado por Docker
-      - /var/run/docker.sock:/var/run/docker.sock
+      - //var/run/docker.sock:/var/run/docker.sock
 
   nexus:
     image: sonatype/nexus3
