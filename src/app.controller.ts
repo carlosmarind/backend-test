@@ -11,6 +11,16 @@ export class AppController {
     return this.appService.getHello();
   }
 
+   @Get('/health')
+  health() {
+    return {
+      status: 'ok',
+      service: 'backend-test',
+      port: Number(process.env.PORT ?? 3000),
+      username: process.env.USERNAME ?? null,
+    };
+  }
+
   @Get('/apikey')
   getApikey(): string {
     return this.appService.getApikey();
