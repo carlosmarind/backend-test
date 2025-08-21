@@ -107,6 +107,7 @@ pipeline {
   }
 }
 
+
   post {
     success { echo "OK -> ${REGISTRY_URL}/${IMAGE_NAME}:${BUILD_NUMBER}" }
     failure { echo "Pipeline falló. Revisa las etapas." }
