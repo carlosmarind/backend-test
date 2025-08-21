@@ -4,8 +4,7 @@ import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
-  const logger = new Logger('bootstrap');
-  logger.log(`Listening on ${await app.getUrl()}`);
+  const port = process.env.PORT ?? 3000;           // usa 3000 por defecto
+  await app.listen(port, '0.0.0.0');               // 👈 importante: todas las interfaces
 }
-bootstrap().catch((e) => console.log(`Error al iniciar la aplicacion: ${e}`));
+bootstrap();
