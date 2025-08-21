@@ -110,35 +110,54 @@ pipeline {
       sh '''
         set -e
 
-        # 1) Copiamos el kubeconfig de la credencial a uno editable local
+        # 0) Trabajamos con una copia local del kubeconfig de la credencial
         cp "$KUBECONFIG_FILE" kubeconfig.patched
 
-        echo "Server actual en kubeconfig:"
-        awk "/server:/{print}" kubeconfig.patched | head -1 || true
+        # 1) Detectar contexto y cluster actuales
+        CTX=$(kubectl --kubeconfig kubeconfig.patched config current-context || true)
+        echo "current-context: ${CTX}"
+        if [ -z "$CTX" ]; then
+          echo "No hay current-context en el kubeconfig, abortando."
+          exit 1
+        fi
+        CLUSTER=$(kubectl --kubeconfig kubeconfig.patched config view -o jsonpath='{.contexts[?(@.name=="'"$CTX"'")].context.cluster}')
+        echo "cluster actual: ${CLUSTER}"
 
-        # 2) Si el server apunta a 127.0.0.1 (inaccesible desde el contenedor de Jenkins),
-        #    lo cambiamos por host.docker.internal manteniendo el puerto
-        if awk "/server:/{print \$2}" kubeconfig.patched | head -1 | grep -qE '^https://127\\.0\\.0\\.1:'; then
-          echo "Parcheando kubeconfig para usar host.docker.internal..."
-          sed -i 's#https://127\\.0\\.0\\.1:#https://host.docker.internal:#' kubeconfig.patched
+        # 2) Leer server actual del cluster
+        SERVER=$(kubectl --kubeconfig kubeconfig.patched config view -o jsonpath='{.clusters[?(@.name=="'"$CLUSTER"'")].cluster.server}')
+        echo "server actual: ${SERVER}"
+
+        # 3) Si el server es 127.0.0.1:PORT, cambiar a host.docker.internal:PORT
+        if echo "$SERVER" | grep -qE '^https://127\\.0\\.0\\.1:[0-9]+'; then
+          PORT=$(echo "$SERVER" | sed -E 's#^https://127\\.0\\.0\\.1:([0-9]+).*#\\1#')
+          NEW_SERVER="https://host.docker.internal:${PORT}"
+          echo "Parcheando server a: ${NEW_SERVER}"
+          kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --server="${NEW_SERVER}"
         fi
 
+        # 4) (Fallback común en Docker Desktop) Si sigue apuntando mal, probar con kubernetes.docker.internal:6443
+        SERVER2=$(kubectl --kubeconfig kubeconfig.patched config view -o jsonpath='{.clusters[?(@.name=="'"$CLUSTER"'")].cluster.server}')
+        if echo "$SERVER2" | grep -qE '^https://127\\.0\\.0\\.1:'; then
+          echo "Usando fallback: https://kubernetes.docker.internal:6443"
+          kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --server="https://kubernetes.docker.internal:6443"
+        fi
+
+        # 5) Ver conectividad (no fallar si info no está pública)
+        kubectl --kubeconfig kubeconfig.patched cluster-info || true
+        kubectl --kubeconfig kubeconfig.patched version --client=true
+
+        # 6) Exportar KUBECONFIG a la copia parcheada y desplegar
         export KUBECONFIG="$PWD/kubeconfig.patched"
-
-        # 3) Diagnóstico rápido
-        kubectl cluster-info || true
-        kubectl version --client=true
-
-        # 4) Aplicamos el manifiesto sin validar contra OpenAPI del API Server
         kubectl apply -f kubernetes.yaml --validate=false
 
-        # 5) Actualizamos imagen y esperamos rollout
+        # 7) Actualizar imagen + esperar rollout
         kubectl set image deployment/backend-test backend='"${REGISTRY}/${IMAGE_NAME}:latest"' -n default
         kubectl rollout status deployment/backend-test -n default
       '''
     }
   }
 }
+
   }
 
   post {
