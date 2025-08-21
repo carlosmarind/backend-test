@@ -4,7 +4,8 @@ pipeline {
   options { timestamps() }
 
   tools {
-    nodejs 'Node20'        // Configurado en Global Tool Configuration
+    nodejs 'Node20'              // Global Tool: NodeJS
+    // SonarScanner lo tomamos con tool() dentro del stage
   }
 
   environment {
@@ -33,17 +34,29 @@ pipeline {
     }
 
     stage('Testing + Coverage') {
-      steps { sh 'npm test -- --coverage' }
+      environment {
+        // Para generar JUnit (requiere npm i -D jest-junit)
+        JEST_JUNIT_OUTPUT = 'junit-report.xml'
+      }
+      steps {
+        sh '''
+          # Si tienes jest-junit: añadimos el reporter JUnit
+          # Si no lo tienes aún, puedes dejar sólo: npm test -- --coverage
+          npm test -- --coverage --reporters=default --reporters=jest-junit || true
+        '''
+      }
     }
 
     stage('Build app') {
-      steps { sh 'npm run build || echo "ajusta el build si tu app no usa npm"' }
+      steps {
+        sh 'npm run build || echo "ajusta el build si tu app no usa npm"'
+      }
     }
 
     stage('SonarQube Scan') {
       steps {
         script {
-          def scannerHome = tool 'SonarScanner'  // Defínelo en Global Tool Configuration
+          def scannerHome = tool 'SonarScanner'  // Global Tool: SonarQube Scanner
           withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
             withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
               sh """
@@ -70,6 +83,7 @@ pipeline {
     }
 
     stage('Build Docker image') {
+      agent { label 'docker' }  // Este nodo debe tener Docker
       steps {
         sh """
           docker build \
@@ -80,6 +94,7 @@ pipeline {
     }
 
     stage('Push to Nexus') {
+      agent { label 'docker' }  // Este nodo debe tener Docker
       steps {
         withCredentials([usernamePassword(credentialsId: 'nexus-docker', passwordVariable: 'NEXUS_PWD', usernameVariable: 'NEXUS_USER')]) {
           sh 'echo "$NEXUS_PWD" | docker login ' + "${env.REGISTRY}" + ' -u "$NEXUS_USER" --password-stdin'
@@ -92,6 +107,7 @@ pipeline {
     }
 
     stage('Deploy to K8s') {
+      agent { label 'docker' }  // Este nodo debe tener kubectl (y acceso al cluster)
       steps {
         withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
           sh '''
@@ -107,7 +123,9 @@ pipeline {
 
   post {
     always {
-      sh 'docker logout ${REGISTRY} || true'
+      // Evita fallo si no hay Docker en este nodo
+      sh 'command -v docker >/dev/null 2>&1 && docker logout ${REGISTRY} || true'
+      // Recoge reportes JUnit si se generaron (jest-junit)
       junit allowEmptyResults: true, testResults: 'junit-report*.xml'
       archiveArtifacts artifacts: 'coverage/**/*, build/**/*', allowEmptyArchive: true
     }
