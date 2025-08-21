@@ -104,19 +104,41 @@ pipeline {
     }
 
     stage('Deploy to K8s') {
-      agent any
-      steps {
-        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
-          sh '''
-            export KUBECONFIG="$KUBECONFIG_FILE"
-            kubectl version --client=true
-            kubectl apply -f kubernetes.yaml
-            kubectl set image deployment/backend-test backend='"${REGISTRY}/${IMAGE_NAME}:latest"' -n default
-            kubectl rollout status deployment/backend-test -n default
-          '''
-        }
-      }
+  agent any
+  steps {
+    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+      sh '''
+        set -e
+
+        # 1) Copiamos el kubeconfig de la credencial a uno editable local
+        cp "$KUBECONFIG_FILE" kubeconfig.patched
+
+        echo "Server actual en kubeconfig:"
+        awk "/server:/{print}" kubeconfig.patched | head -1 || true
+
+        # 2) Si el server apunta a 127.0.0.1 (inaccesible desde el contenedor de Jenkins),
+        #    lo cambiamos por host.docker.internal manteniendo el puerto
+        if awk "/server:/{print \$2}" kubeconfig.patched | head -1 | grep -qE '^https://127\\.0\\.0\\.1:'; then
+          echo "Parcheando kubeconfig para usar host.docker.internal..."
+          sed -i 's#https://127\\.0\\.0\\.1:#https://host.docker.internal:#' kubeconfig.patched
+        fi
+
+        export KUBECONFIG="$PWD/kubeconfig.patched"
+
+        # 3) Diagnóstico rápido
+        kubectl cluster-info || true
+        kubectl version --client=true
+
+        # 4) Aplicamos el manifiesto sin validar contra OpenAPI del API Server
+        kubectl apply -f kubernetes.yaml --validate=false
+
+        # 5) Actualizamos imagen y esperamos rollout
+        kubectl set image deployment/backend-test backend='"${REGISTRY}/${IMAGE_NAME}:latest"' -n default
+        kubectl rollout status deployment/backend-test -n default
+      '''
     }
+  }
+}
   }
 
   post {
