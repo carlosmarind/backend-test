@@ -47,9 +47,12 @@ pipeline {
                 }
                 script {
                     docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} localhost:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
+                        
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} localhost:8082/${IMAGE_NAME}:latest"
                         sh "docker push localhost:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
-                    }
+                        sh "docker push localhost:8082/${IMAGE_NAME}:latest"
+                }
                 }
             }
         }
