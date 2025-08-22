@@ -28,13 +28,13 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    args '--network=dockercompose_devnet'
+                    args "-v ${env.WORKSPACE}:${env.WORKSPACE} --network=dockercompose_devnet"
                 }
             }
             steps {
-                 withSonarQubeEnv('SonarQube') {
-                        sh "cd ${env.WORKSPACE} && sonar-scanner -Dsonar.projectKey=backend-test -Dsonar.sources=src -Dsonar.tests=src -Dsonar.javascript.lcov.reportPaths=${env.WORKSPACE}/coverage/lcov.info"
-                    }
+                withSonarQubeEnv('SonarQube') {
+                    sh "sonar-scanner -Dsonar.projectKey=backend-test -Dsonar.sources=src -Dsonar.tests=src -Dsonar.javascript.lcov.reportPaths=${env.WORKSPACE}/coverage/lcov.info"
+                }
             }
         }
 
