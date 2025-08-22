@@ -41,7 +41,6 @@ pipeline {
                             -Dsonar.sources=. \
                             -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
                             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
                             -Dsonar.qualitygate.wait=true
                         """
                     }
