@@ -52,7 +52,7 @@ pipeline {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} localhost:8082/${IMAGE_NAME}:latest"
                         sh "docker push localhost:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
                         sh "docker push localhost:8082/${IMAGE_NAME}:latest"
-                }
+                    }
                 }
             }
         }
