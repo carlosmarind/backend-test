@@ -67,7 +67,7 @@ pipeline {
 
                         // Actualiza tag ebl en Nexus
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} nexus:8082/${IMAGE_NAME}:ebl"
-                        sh "docker push nexus:8082/${IMAGE_NAME}:ebl"
+                        sh "docker push nexus:8082/${IMAGE_NAME}:latest"
                     }
                 }
             }
