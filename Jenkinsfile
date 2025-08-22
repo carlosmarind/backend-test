@@ -14,9 +14,9 @@ pipeline {
     }
 
     stages {
-        stage('Instalación de dependencias..') {
+        stage('Instalación de dependencias') {
             steps {
-                sh 'npm install'
+                sh 'npm ci' // más rápido que npm install
             }
         }
 
@@ -36,53 +36,51 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    args '--network=devnet -v $WORKSPACE:/usr/src'
+                    args '-v $WORKSPACE:/usr/src'
                     reuseNode true
                 }
             }
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh """
+                    sh '''
                         sonar-scanner \
                         -Dsonar.projectKey=backend-test \
-                        -Dsonar.sources=src \
-                        -Dsonar.tests=src \
-                        -Dsonar.test.inclusions="**/*.spec.ts" \
-                        -Dsonar.exclusions="node_modules/**,dist/**" \
-                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-                    """
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.qualitygate.wait=true
+                    '''
                 }
             }
         }
 
         stage('Quality Gate') {
-                steps {
-                        timeout(time: 20, unit: 'MINUTES') {  // Aumentamos el tiempo de espera
-                            script {
-                                def qualityGate = waitForQualityGate abortPipeline: false
-                                if (qualityGate.status != 'OK') {
-                                    echo "⚠️ Quality Gate NO aprobado: ${qualityGate.status}"
-                                    // Puedes decidir fallar el build o continuar
-                                    error("Pipeline detenido porque no pasó el Quality Gate: ${qualityGate.status}")
-                                } else {
-                                    echo "✅ Quality Gate aprobado"
-                                }
-                            }
+            steps {
+                timeout(time: 10, unit: 'MINUTES') { // optimizado
+                    script {
+                        def gate = waitForQualityGate()
+                        if (gate.status != 'OK') {
+                            error "Quality Gate failed with status: ${gate.status}"
                         }
                     }
+                }
+            }
         }
 
         stage('Empaquetado y push Docker') {
             steps {
                 script {
+                    // Limpiar imágenes antiguas
                     sh """
                         docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
                         | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
                     """
 
+                    // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
 
+                        // Etiquetar como 'ebl' antes de push
                         sh "docker rmi ${IMAGE_NAME}:ebl || true"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
 
@@ -90,18 +88,18 @@ pipeline {
                         sh "docker push ${IMAGE_NAME}:ebl"
                     }
 
+                    // Nexus
                     def nexusHost = sh(
                         script: 'ping -c 1 nexus >/dev/null 2>&1 && echo "nexus" || echo "localhost"',
                         returnStdout: true
                     ).trim()
 
                     echo "Usando Nexus host: ${nexusHost}"
+
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
-                        // Tag único en Nexus
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
 
-                        // Actualiza tag ebl en Nexus
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                     }
