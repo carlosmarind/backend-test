@@ -35,7 +35,9 @@ pipeline {
                                 -Dsonar.sources=src \
                                 -Dsonar.tests=src \
                                 -Dsonar.test.inclusions=src/**/*.spec.ts \
-                                -Dsonar.login=$SONAR_AUTH_TOKEN
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.login=$SONAR_AUTH_TOKEN \
+                                -Dsonar.host.url=$SONAR_HOST_URL
                             '''
                         }
                     }
