@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'edgardobenavidesl/node-with-docker-cli:22'
-            args '-v /var/run/docker.sock:/var/run/docker.sock --network=jenkins-sonar-network'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
     }
@@ -11,7 +11,9 @@ pipeline {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
-        SONAR_HOST_URL = "http://sonarqube:9000" // Hostname de SonarQube en la red Docker
+        // URL de SonarQube en el host
+        SONAR_HOST_URL = "http://host.docker.internal:9000" // si Jenkins está en Windows/Mac
+        // SONAR_HOST_URL = "http://localhost:9000" // si Jenkins está en Linux con Docker
     }
 
     stages {
@@ -37,7 +39,7 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    args '-v $WORKSPACE:/usr/src --network=jenkins-sonar-network'
+                    args '-v $WORKSPACE:/usr/src'
                     reuseNode true
                 }
             }
@@ -58,7 +60,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') { // optimizado
+                timeout(time: 10, unit: 'MINUTES') {
                     script {
                         def gate = waitForQualityGate()
                         if (gate.status != 'OK') {
@@ -81,8 +83,10 @@ pipeline {
                     // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
+
                         sh "docker rmi ${IMAGE_NAME}:ebl || true"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
+
                         app.push("${BUILD_TAG}")
                         sh "docker push ${IMAGE_NAME}:ebl"
                     }
@@ -98,6 +102,7 @@ pipeline {
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
+
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                     }
