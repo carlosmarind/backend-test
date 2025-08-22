@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'node:18'
+            image 'node:22'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
