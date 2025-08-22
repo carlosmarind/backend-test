@@ -27,20 +27,23 @@ pipeline {
         stage('Quality Assurance') {
             steps {
                 withCredentials([string(credentialsId: 'sonarqube-credentials', variable: 'SONAR_TOKEN')]) {
-                    docker.image('sonarsource/sonar-scanner-cli:latest').inside('--network dockercompose_devnet') {
-                        sh """
-                            sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=src \
-                            -Dsonar.tests=src \
-                            -Dsonar.test.inclusions=src/**/*.spec.ts \
-                            -Dsonar.host.url=http://sonarqube:9000 \
-                            -Dsonar.login=$SONAR_TOKEN
-                        """
+                    script {
+                        docker.image('sonarsource/sonar-scanner-cli:latest').inside('--network dockercompose_devnet') {
+                            sh """
+                                sonar-scanner \
+                                -Dsonar.projectKey=backend-test \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=src \
+                                -Dsonar.test.inclusions=src/**/*.spec.ts \
+                                -Dsonar.host.url=http://sonarqube:9000 \
+                                -Dsonar.login=$SONAR_TOKEN
+                            """
+                        }
                     }
                 }
             }
-        }
+}
+
 
         stage('Quality Gate'){
             steps {
