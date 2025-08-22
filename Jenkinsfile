@@ -40,52 +40,47 @@ pipeline {
                     reuseNode true
                 }
             }
-            stage('upload de codigo a sonarqube')
-            {
-                steps {
-                    withSonarQubeEnv('SonarQube') {
-                        sh 'sonar-scanner'
-                    }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh """
+                        sonar-scanner \
+                        -Dsonar.projectKey=backend-test \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.test.inclusions="**/*.spec.ts" \
+                        -Dsonar.exclusions="node_modules/**,dist/**" \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                    """
                 }
             }
-            // stage('Quality Gate')
-            // {
-            //     steps {
-            //         timeout(time: 30, unit: 'SECONDS'){
-            //             script {
-            //                 def gp=waitForQualityGate()
-            //                 if (gp.satus !='OK')
-            //                 {
-            //                     error  "Quality Gate falled whit status: ${gp.status}"
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 1, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
         }
 
         stage('Empaquetado y push Docker') {
             steps {
                 script {
-                    // Limpiar imágenes antiguas
                     sh """
                         docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
                         | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
                     """
 
-                    // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
 
-                        // Etiquetar como 'ebl' antes de push
                         sh "docker rmi ${IMAGE_NAME}:ebl || true"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
 
-                        app.push("${BUILD_TAG}")  // push tag único
-                        sh "docker push ${IMAGE_NAME}:ebl"  // push tag ebl
+                        app.push("${BUILD_TAG}")
+                        sh "docker push ${IMAGE_NAME}:ebl"
                     }
 
-                    // Determinar host de Nexus
                     def nexusHost = sh(
                         script: 'ping -c 1 nexus >/dev/null 2>&1 && echo "nexus" || echo "localhost"',
                         returnStdout: true
@@ -94,20 +89,14 @@ pipeline {
                     echo "Usando Nexus host: ${nexusHost}"
 
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
-                        // Tag único en Nexus
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
 
-                        // Actualiza tag ebl / latest en Nexus
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
-
-                        // sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:latest"
-                        // sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:latest"
                     }
                 }
             }
         }
-
     }
 }
