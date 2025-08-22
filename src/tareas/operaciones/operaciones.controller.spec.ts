@@ -1,41 +1,70 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { AppModule } from '../../../src/app.module';
+import { OperacionesController } from './operaciones.controller';
+import { OperacionesService } from './operaciones.service';
+import { Response } from 'express';
 
-describe('OperacionesController (e2e)', () => {
-  let app: INestApplication;
+describe('OperacionesController', () => {
+  let controller: OperacionesController;
+  let service: OperacionesService;
 
   beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [OperacionesController],
+      providers: [OperacionesService],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
+    controller = module.get<OperacionesController>(OperacionesController);
+    service = module.get<OperacionesService>(OperacionesService);
   });
 
-  it('/operaciones suma', () => {
-    return request(app.getHttpServer())
-      .get('/operaciones')
-      .query({ operacion: 'suma', a: 10, b: 30 })
-      .expect(200)
-      .expect({ resultado: 40, mensaje: 'operacion exitosa' });
+  it('debería retornar resultado correcto cuando la operación es válida', () => {
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as Response;
+
+    jest.spyOn(service, 'operar').mockReturnValue(5);
+
+    controller.operar(res, 'suma', 2, 3);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      resultado: 5,
+      mensaje: 'operacion exitosa',
+    });
   });
 
-  it('/operaciones resta cero', () => {
-    return request(app.getHttpServer())
-      .get('/operaciones')
-      .query({ operacion: 'resta', a: 2, b: 2 })
-      .expect(200)
-      .expect({ resultado: 0, mensaje: 'operacion exitosa' });
+  it('debería retornar error cuando la operación no es válida', () => {
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as Response;
+
+    jest.spyOn(service, 'operar').mockReturnValue(undefined);
+
+    controller.operar(res, 'potencia', 2, 3);
+
+    expect(res.status).toHaveBeenCalledWith(502);
+    expect(res.json).toHaveBeenCalledWith({
+      resultado: null,
+      mensaje: 'operacion no pudo ser calculada',
+    });
   });
 
-  it('/operaciones invalida', () => {
-    return request(app.getHttpServer())
-      .get('/operaciones')
-      .query({ operacion: 'potencia', a: 2, b: 3 })
-      .expect(502)
-      .expect({ resultado: null, mensaje: 'operacion no pudo ser calculada' });
+  it('debería retornar NaN si el service devuelve NaN', () => {
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as Response;
+
+    jest.spyOn(service, 'operar').mockReturnValue(NaN);
+
+    controller.operar(res, 'division', 10, 0);
+
+    expect(res.status).toHaveBeenCalledWith(502);
+    expect(res.json).toHaveBeenCalledWith({
+      resultado: null,
+      mensaje: 'operacion no pudo ser calculada',
+    });
   });
 });

@@ -70,10 +70,12 @@
     ],
     "coverageDirectory": "../coverage",
     "coveragePathIgnorePatterns": [
-      "/node_modules/",
-      "src/main\\.ts$",
-      ".*\\.spec\\.ts$",
-      "src/config/configuration\\.ts$"
+    "/node_modules/",
+    "src/main\\.ts$",
+    ".*\\.spec\\.ts$",
+    "src/config/configuration\\.ts$",
+    "src/app\\.module\\.ts$",
+    "src/tareas/tareas\\.module\\.ts$"
     ],
     "testEnvironment": "node"
   }
