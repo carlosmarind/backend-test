@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'edgardobenavidesl/backend-test' // Tu imagen con Node.js y npm
+            image 'edgardobenavidesl/backend-test'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
@@ -13,48 +13,42 @@ pipeline {
 
     stages {
         stage('Instalación de dependencias') {
-            steps { 
-                sh 'npm ci' 
-            }
+            steps { sh 'npm install' }
         }
 
-        stage('Pruebas automatizadas con cobertura') {
-            steps { 
-                sh 'npm run test:cov' 
-            }
+        stage('Pruebas automatizadas') {
+            steps { sh 'npm run test:cov' }
         }
 
         stage('Construcción de aplicación') {
-            steps { 
-                sh 'npm run build' 
-            }
+            steps { sh 'npm run build' }
         }
 
         stage('Quality Assurance') {
-    steps {
-        withSonarQubeEnv('SonarQube') {
-            script {
-                docker.image('sonarsource/sonar-scanner-cli:latest').inside("-v $WORKSPACE:/usr/src/app -w /usr/src/app") {
-                    sh '''
-                        sonar-scanner \
-                        -Dsonar.projectKey=backend-test \
-                        -Dsonar.sources=src \
-                        -Dsonar.tests=src \
-                        -Dsonar.test.inclusions=**/*.spec.ts \
-                        -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/*.spec.ts \
-                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                        -Dsonar.login=$SONAR_AUTH_TOKEN
-                    '''
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    script {
+                        docker.image('sonarsource/sonar-scanner-cli:latest').inside("--network=dockercompose_devnet -v $WORKSPACE:/usr/src/app -w /usr/src/app") {
+                            sh '''
+                                sonar-scanner \
+                                -Dsonar.projectKey=backend-test \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=src \
+                                -Dsonar.test.inclusions=**/*.spec.ts \
+                                -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/*.spec.ts \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.host.url=http://sonarqube:9000 \
+                                -Dsonar.login=$SONAR_AUTH_TOKEN
+                            '''
+                        }
+                    }
                 }
             }
         }
-    }
-}
 
-
-        stage('Quality Gate') {
+        stage('Quality Gate'){
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 3, unit: 'MINUTES') { // Aumentamos el tiempo a 3 min
                     waitForQualityGate abortPipeline: true
                 }
             }
