@@ -26,28 +26,26 @@ pipeline {
 
         stage('Quality Assurance') {
             steps {
-                withCredentials([string(credentialsId: 'sonarqube-credentials', variable: 'SONAR_TOKEN')]) {
+                withSonarQubeEnv('SonarQube') { 
                     script {
                         docker.image('sonarsource/sonar-scanner-cli:latest').inside('--network dockercompose_devnet') {
-                            sh """
+                            sh '''
                                 sonar-scanner \
                                 -Dsonar.projectKey=backend-test \
                                 -Dsonar.sources=src \
                                 -Dsonar.tests=src \
                                 -Dsonar.test.inclusions=src/**/*.spec.ts \
-                                -Dsonar.host.url=http://sonarqube:9000 \
-                                -Dsonar.login=$SONAR_TOKEN
-                            """
+                                -Dsonar.login=$SONAR_AUTH_TOKEN
+                            '''
                         }
                     }
                 }
             }
-}
-
+        }
 
         stage('Quality Gate'){
             steps {
-                timeout(time: 30, unit: 'SECONDS') {
+                timeout(time: 1, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -59,8 +57,8 @@ pipeline {
                     def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
 
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        app.push()          
-                        app.push("gdd")     
+                        app.push()
+                        app.push("gdd")
                     }
 
                     docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
