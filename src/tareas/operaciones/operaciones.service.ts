@@ -2,17 +2,18 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class OperacionesService {
-  operar(operacion: string = 'suma', a: number, b: number) {
-    if (operacion === 'suma') {
-      return this.#suma(a, b);
-    } else if (operacion === 'resta') {
-      return this.#resta(a, b);
-    } else if (operacion === 'multiplicacion') {
-      return this.#multiplicacion(a, b);
-    } else if (operacion === 'division') {
-      return this.#division(a, b);
-    }else{
-      return this.#error();
+  operar(operacion: string, a: number, b: number) {
+    switch (operacion) {
+      case 'suma':
+        return this.#suma(a, b);
+      case 'resta':
+        return this.#resta(a, b);
+      case 'multiplicacion':
+        return this.#multiplicacion(a, b);
+      case 'division':
+        return this.#division(a, b);
+      default:
+        return this.#error();
     }
   }
 
@@ -29,14 +30,12 @@ export class OperacionesService {
   }
 
   #division(a: number, b: number) {
-    if (b === 0) {
-      return NaN;
-    } else if (a === 0) {
-      return 0;
-    }
+    if (b === 0) return NaN;
+    if (a === 0) return 0;
     return a / b;
   }
-  #error(){
+
+  #error() {
     return undefined;
   }
 }
