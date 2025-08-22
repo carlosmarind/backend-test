@@ -35,7 +35,7 @@ pipeline {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
                     // Montamos workspace para que el scanner vea el código
-                    args '-v $WORKSPACE:/usr/src'
+                     args '--network=devnet -v $WORKSPACE:/usr/src'
                     reuseNode true
                 }
             }
