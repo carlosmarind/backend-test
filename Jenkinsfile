@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:22'          // Contenedor con Node y npm
+            args "-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/usr/src -w /usr/src"
+        }
+    }
 
     environment {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
@@ -30,15 +35,8 @@ pipeline {
         }
 
         stage('Ejecución de pruebas y cobertura') {
-            agent {
-                docker {
-                    image 'node:22'
-                    args "-v $WORKSPACE:/usr/src -w /usr/src"
-                }
-            }
             steps {
-                sh 'npm install'         // asegura dependencias dentro del contenedor
-                sh 'npm run test:cov'    // genera coverage/lcov.info
+                sh 'npm run test:cov'
             }
         }
 
