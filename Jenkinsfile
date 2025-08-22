@@ -9,7 +9,6 @@ pipeline {
 
     environment {
         IMAGE_NAME = "gdiaz90/backend-test"
-        SONAR_HOST_URL = "http://sonarqube:9000"
     }
 
     stages {
@@ -26,26 +25,22 @@ pipeline {
         }
 
         stage('Quality Assurance') {
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                            sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=. \
-                            -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.qualitygate.wait=true
-                        """
-                    }
+            agent {
+                docker {
+                    image 'sonarsource/sonar-scanner-cli'
+                    args '--network=dockercompose_devnet'
                 }
+            }
+            steps {
+                 withSonarQubeEnv('SonarQube') {
+                    sh 'sonar-scanner'
+        }
             }
         }
 
         stage('Quality Gate'){
             steps {
-                timeout(time: 2, unit: 'MINUTES') {
+                timeout(time: 30, unit: 'SECONDS') {
                     waitForQualityGate abortPipeline: true
                 }
             }
