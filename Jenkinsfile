@@ -9,6 +9,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
+        BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
     }
 
     stages {
@@ -34,8 +35,7 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    // Montamos workspace para que el scanner vea el código
-                     args '--network=devnet -v $WORKSPACE:/usr/src'
+                    args '--network=devnet -v $WORKSPACE:/usr/src'
                     reuseNode true
                 }
             }
@@ -49,17 +49,24 @@ pipeline {
         stage('Empaquetado y push Docker') {
             steps {
                 script {
-                    // Push a DockerHub
+                    // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
-                        app.push()
+                        // Build con tag único
+                        def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
+                        
+                        // Etiqueta como ebl y push
                         app.push("ebl")
+                        app.push()
                     }
-                }
-                script {
-                    // Push a Nexus
+
+                    // Nexus
                     docker.withRegistry('http://nexus:8082', 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} nexus:8082/${IMAGE_NAME}:ebl"
+                        // Tag único en Nexus
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} nexus:8082/${IMAGE_NAME}:${BUILD_TAG}"
+                        sh "docker push nexus:8082/${IMAGE_NAME}:${BUILD_TAG}"
+
+                        // Actualiza tag ebl en Nexus
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} nexus:8082/${IMAGE_NAME}:ebl"
                         sh "docker push nexus:8082/${IMAGE_NAME}:ebl"
                     }
                 }
