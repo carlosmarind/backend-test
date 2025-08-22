@@ -66,7 +66,10 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.ts",
+      "!**/*.spec.ts",
+      "!src/main.ts",
+      "!src/config/**"
     ],
     "coverageDirectory": "../coverage",
     "coveragePathIgnorePatterns": [
