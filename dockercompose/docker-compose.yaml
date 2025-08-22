@@ -22,7 +22,7 @@ services:
       context: ./jenkins
       dockerfile: Dockerfile
     container_name: jenkins
-    user: root   # para acceso al docker.sock
+    user: root
     restart: always
     ports:
       - "8080:8080"
@@ -32,7 +32,7 @@ services:
     networks:
       - devnet
 
-  # ----------------------------.
+  # ----------------------------
   # Nexus Repository
   # ----------------------------
   nexus:
@@ -80,11 +80,11 @@ services:
       - devnet
 
 # ----------------------------
-# Red personalizada
+# Red externa
 # ----------------------------
 networks:
   devnet:
-    driver: bridge
+    external: true
 
 # ----------------------------
 # Volúmenes persistentes
