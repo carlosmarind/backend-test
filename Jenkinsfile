@@ -50,20 +50,18 @@ pipeline {
         stage('Quality Assurance') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    script {
-                        // Ejecutamos sonar dentro del contenedor Node 18
-                        sh """
-                        npx sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=src \
-                            -Dsonar.tests=src \
-                            -Dsonar.test.inclusions=src/**/*.spec.ts \
-                            -Dsonar.exclusions=coverage/**,src/config/configuration.ts,src/**/*.spec.ts \
-                            -Dsonar.coverage.exclusions=src/**/*.spec.ts \
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.login=$SONAR_AUTH_TOKEN
-                        """
-                    }
+                    sh '''
+                    npm install -g sonar-scanner
+                    sonar-scanner \
+                        -Dsonar.projectKey=backend-test \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.test.inclusions=src/**/*.spec.ts \
+                        -Dsonar.exclusions=coverage/**,src/config/configuration.ts,src/**/*.spec.ts \
+                        -Dsonar.coverage.exclusions=src/**/*.spec.ts \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.login=$SONAR_AUTH_TOKEN
+                    '''
                 }
             }
         }
