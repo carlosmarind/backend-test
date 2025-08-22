@@ -33,8 +33,8 @@ pipeline {
             }
             steps {
                  withSonarQubeEnv('SonarQube') {
-                    sh 'sonar-scanner'
-        }
+                        sh "cd ${env.WORKSPACE} && sonar-scanner -Dsonar.projectKey=backend-test -Dsonar.sources=src -Dsonar.tests=src -Dsonar.javascript.lcov.reportPaths=${env.WORKSPACE}/coverage/lcov.info"
+                    }
             }
         }
 
