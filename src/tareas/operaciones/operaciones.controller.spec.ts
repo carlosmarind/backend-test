@@ -7,11 +7,11 @@ describe('OperacionesController', () => {
   let controller: OperacionesController;
 
   const mockResponse = () => {
-    const res: Partial<Response> = {};
-    res.status = jest.fn().mockReturnValue(res);
-    res.json = jest.fn().mockReturnValue(res);
-    return res as Response;
-  };
+  const res: Partial<Response> = {};
+  res.status = jest.fn().mockReturnValue(res);
+  res.json = jest.fn().mockReturnValue(res);
+  return res as Response;
+};
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
