@@ -1,5 +1,4 @@
 version: '3.9'
-
 services:
   app:
     build:
@@ -15,22 +14,24 @@ services:
     build:
       context: ../jenkins
       dockerfile: Dockerfile
-    container_name: jenkins
     restart: always
     ports:
       - "8080:8080"
-      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - //var/run/docker.sock:/var/run/docker.sock  # acceso al Docker del host
     networks:
       - devnet
-    volumes:
-      - jenkins_home:/var/jenkins_home   # 🔑 volumen administrado por Docker
-      - //var/run/docker.sock:/var/run/docker.sock
 
   nexus:
     image: sonatype/nexus3
     container_name: nexus_repo
+    volumes:
+      - nexus-data:/nexus-data
     ports:
-      - "8081-8083:8081-8083"
+      - "8081:8081"
+      - "8082:8082"
+      - "8083:8083"
     networks:
       - devnet
 
@@ -52,17 +53,21 @@ services:
     image: postgres:15
     container_name: db_sonar
     environment:
-      POSTGRES_USER: sonar
-      POSTGRES_PASSWORD: sonar
-      POSTGRES_DB: sonarqube
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonar
+      - POSTGRES_DB=sonar
     networks:
       - devnet
+    volumes:
+      - postgresql:/var/lib/postgresql
+      - postgresql_data:/var/lib/postgresql/data
 
 networks:
   devnet:
+    driver: bridge
 
 volumes:
-  jenkins_home:   # 🔑 aquí definimos el volumen persistente de Jenkins
+  jenkins_home:
   nexus-data:
   postgresql:
   postgresql_data:
