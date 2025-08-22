@@ -34,7 +34,7 @@ pipeline {
             steps {
                 dir("$WORKSPACE") {
                     withSonarQubeEnv('SonarQube') {
-                        sh 'sonar-scanner -Dsonar.host.url=http://host.docker.internal:9000'
+                        sh 'sonar-scanner -Dsonar.host.url=http://sonarqube:9000'
                     }
                 }
             }
