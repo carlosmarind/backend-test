@@ -85,8 +85,8 @@ pipeline {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
 
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:latest"
-                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:latest"
+                        // sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:latest"
+                        // sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:latest"
                     }
                 }
             }
