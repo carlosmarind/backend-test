@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'edgardobenavidesl/node-with-docker-cli:22'
+            image 'node:18'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
@@ -48,49 +48,40 @@ pipeline {
         }
 
         stage('Quality Assurance') {
-    steps {
-        withSonarQubeEnv('SonarQube') {
-            script {
-                // Usamos Node 18 para compatibilidad
-                docker.image('node:18').inside('--network dockercompose_devnet -v $WORKSPACE:/workspace -w /workspace') {
-                    // Generar cobertura antes de sonar
-                    sh 'npm run test:cov'
-
-                    // Ejecutar sonar-scanner
-                    sh """
-                    npx sonar-scanner \
-                        -Dsonar.projectKey=backend-test \
-                        -Dsonar.sources=src \
-                        -Dsonar.tests=src \
-                        -Dsonar.test.inclusions=src/**/*.spec.ts \
-                        -Dsonar.exclusions=coverage/**,src/config/configuration.ts,src/**/*.spec.ts \
-                        -Dsonar.coverage.exclusions=src/**/*.spec.ts \
-                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                        -Dsonar.login=$SONAR_AUTH_TOKEN
-                    """
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    script {
+                        // Ejecutamos sonar dentro del contenedor Node 18
+                        sh """
+                        npx sonar-scanner \
+                            -Dsonar.projectKey=backend-test \
+                            -Dsonar.sources=src \
+                            -Dsonar.tests=src \
+                            -Dsonar.test.inclusions=src/**/*.spec.ts \
+                            -Dsonar.exclusions=coverage/**,src/config/configuration.ts,src/**/*.spec.ts \
+                            -Dsonar.coverage.exclusions=src/**/*.spec.ts \
+                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                            -Dsonar.login=$SONAR_AUTH_TOKEN
+                        """
+                    }
                 }
             }
         }
-    }
-}
 
-stage('Quality Gate') {
-    steps {
-        timeout(time: 10, unit: 'MINUTES') { // aumentamos timeout
-            script {
-                // Esperamos que el servidor procese el análisis
-                def gate = waitForQualityGate()
-                if (gate.status != 'OK') {
-                    error "Quality Gate failed with status: ${gate.status}"
-                } else {
-                    echo "Quality Gate passed!"
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') { 
+                    script {
+                        def gate = waitForQualityGate()
+                        if (gate.status != 'OK') {
+                            error "Quality Gate failed with status: ${gate.status}"
+                        } else {
+                            echo "Quality Gate passed!"
+                        }
+                    }
                 }
             }
         }
-    }
-}
-
-
 
         stage('Empaquetado y push Docker') {
             steps {
