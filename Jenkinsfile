@@ -96,13 +96,13 @@ pipeline {
 
                     // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
+                        def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
 
-                        sh "docker rmi ${IMAGE_NAME}:ebl || true"
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
+                        sh "docker rmi ${IMAGE_NAME}:latest || true"
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest"
 
-                        app.push("${BUILD_TAG}")
-                        sh "docker push ${IMAGE_NAME}:ebl"
+                        app.push("${BUILD_NUMBER}")
+                        sh "docker push ${IMAGE_NAME}:latest"
                     }
 
                     // Nexus
