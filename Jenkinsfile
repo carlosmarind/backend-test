@@ -28,13 +28,15 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    args '--network=dockercompose_devnet'
+                    args '-v $WORKSPACE:$WORKSPACE -w $WORKSPACE'
                 }
             }
             steps {
-                 withSonarQubeEnv('SonarQube') {
-                    sh 'sonar-scanner'
-        }
+                dir("$WORKSPACE") {
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'sonar-scanner'
+                    }
+                }
             }
         }
 
