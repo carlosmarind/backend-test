@@ -36,19 +36,14 @@ spec:
           image: host.docker.internal:8082/labo3/backend-test:latest
           ports:
             - containerPort: 3000
-          env:
-            - name: USERNAME
-              valueFrom:
-                configMapKeyRef:
-                  name: backend-config
-                  key: USERNAME
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: backend-secrets
-                  key: API_KEY
-      imagePullSecrets:
-        - name: nexus-creds
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+      # Si necesitas auth para pull, descomenta y crea el secret nexus-creds
+      # imagePullSecrets:
+      #   - name: nexus-creds
 ---
 apiVersion: v1
 kind: Service
