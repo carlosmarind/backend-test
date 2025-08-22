@@ -1,8 +1,8 @@
 pipeline {
     agent {
-        docker {
-            image 'node:22'          // Contenedor con Node y npm
-            args "-v /var/run/docker.sock:/var/run/docker.sock -v $WORKSPACE:/usr/src -w /usr/src"
+        docker { 
+            image 'node:22' 
+            args '-u 0:0' // Ejecutar como root para permisos de instalación
         }
     }
 
@@ -14,23 +14,9 @@ pipeline {
     }
 
     stages {
-        stage('Checkout SCM') {
-            steps {
-                checkout([$class: 'GitSCM',
-                    branches: [[name: 'main']],
-                    doGenerateSubmoduleConfigurations: false,
-                    extensions: [],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/EdgardoBenavides/backend-test.git',
-                        credentialsId: 'Githubpas'
-                    ]]
-                ])
-            }
-        }
-
         stage('Instalación de dependencias') {
             steps {
-                sh 'npm install'
+                sh 'npm ci'
             }
         }
 
@@ -47,21 +33,16 @@ pipeline {
         }
 
         stage('Quality Assurance') {
-            agent {
-                docker {
-                    image 'sonarsource/sonar-scanner-cli'
-                    args "-v $WORKSPACE:/usr/src -w /usr/src"
-                }
-            }
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh """
-                        sonar-scanner \
+                        npx sonar-scanner \
                         -Dsonar.projectKey=backend-test \
-                        -Dsonar.sources=. \
-                        -Dsonar.exclusions=node_modules/**,dist/** \
-                        -Dsonar.coverage.exclusions=src/**/*.spec.ts \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
                         -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.coverage.exclusions=src/**/*.spec.ts \
+                        -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
                         -Dsonar.host.url=${SONAR_HOST_URL} \
                         -Dsonar.qualitygate.wait=true
                     """
@@ -94,7 +75,6 @@ pipeline {
                     // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
-                        sh "docker rmi ${IMAGE_NAME}:ebl || true"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
                         app.push("${BUILD_TAG}")
                         sh "docker push ${IMAGE_NAME}:ebl"
@@ -105,8 +85,6 @@ pipeline {
                         script: 'ping -c 1 nexus >/dev/null 2>&1 && echo "nexus" || echo "localhost"',
                         returnStdout: true
                     ).trim()
-
-                    echo "Usando Nexus host: ${nexusHost}"
 
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
