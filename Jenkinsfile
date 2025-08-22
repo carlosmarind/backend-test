@@ -32,9 +32,17 @@ pipeline {
                 }
             }
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh 'sonar-scanner'
-                }
+                 withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=backend-test \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.exclusions=src/**/*.spec.ts,src/config/configuration.ts \
+                        -Dsonar.test.inclusions=src/**/*.spec.ts \
+                        -Dsonar.branch.name=cicd-gdd
+                    '''
+        }
             }
         }
 
