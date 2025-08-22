@@ -27,7 +27,7 @@ pipeline {
         stage('Quality Assurance') {
             steps {
                 withCredentials([string(credentialsId: 'sonarqube-credentials', variable: 'SONAR_TOKEN')]) {
-                    withSonarQubeEnv('SonarQube') {
+                    docker.image('sonarsource/sonar-scanner-cli:latest').inside('--network dockercompose_devnet') {
                         sh """
                             sonar-scanner \
                             -Dsonar.projectKey=backend-test \
