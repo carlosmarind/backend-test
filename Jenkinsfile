@@ -56,11 +56,20 @@ pipeline {
         }
 
         stage('Quality Gate') {
-            steps {
-                timeout(time: 1, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
+                steps {
+                        timeout(time: 10, unit: 'MINUTES') {  // Aumentamos el tiempo de espera
+                            script {
+                                def qualityGate = waitForQualityGate abortPipeline: false
+                                if (qualityGate.status != 'OK') {
+                                    echo "⚠️ Quality Gate NO aprobado: ${qualityGate.status}"
+                                    // Puedes decidir fallar el build o continuar
+                                    error("Pipeline detenido porque no pasó el Quality Gate: ${qualityGate.status}")
+                                } else {
+                                    echo "✅ Quality Gate aprobado"
+                                }
+                            }
+                        }
+                    }
         }
 
         stage('Empaquetado y push Docker') {
@@ -87,12 +96,13 @@ pipeline {
                     ).trim()
 
                     echo "Usando Nexus host: ${nexusHost}"
-
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
+                        // Tag único en Nexus
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
 
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
+                        // Actualiza tag ebl en Nexus
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                     }
                 }
