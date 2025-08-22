@@ -6,29 +6,36 @@ pipeline {
             reuseNode true
         }
     }
- 
+
     environment {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
     }
- 
+
     stages {
         stage('Instalación de dependencias..') {
-            steps { sh 'npm install' }
+            steps {
+                sh 'npm install'
+            }
         }
- 
+
         stage('Ejecución de pruebas automatizadas') {
-            steps { sh 'npm run test:cov' }
+            steps {
+                sh 'npm run test:cov'
+            }
         }
- 
+
         stage('Construcción de aplicación') {
-            steps { sh 'npm run build' }
+            steps {
+                sh 'npm run build'
+            }
         }
 
         stage('Quality Assurance') {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    args '--network=infra_default'
+                    // Montamos workspace para que el scanner vea el código
+                    args '-v $WORKSPACE:/usr/src'
                     reuseNode true
                 }
             }
@@ -42,16 +49,18 @@ pipeline {
         stage('Empaquetado y push Docker') {
             steps {
                 script {
+                    // Push a DockerHub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
-                        app.push()          
-                        app.push("ebl")  
+                        app.push()
+                        app.push("ebl")
                     }
                 }
                 script {
-                    docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} localhost:8082/${IMAGE_NAME}:ebl"
-                        sh "docker push localhost:8082/${IMAGE_NAME}:ebl"
+                    // Push a Nexus
+                    docker.withRegistry('http://nexus:8082', 'nexus-credentials') {
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} nexus:8082/${IMAGE_NAME}:ebl"
+                        sh "docker push nexus:8082/${IMAGE_NAME}:ebl"
                     }
                 }
             }
