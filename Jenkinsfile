@@ -10,7 +10,7 @@ pipeline {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
-        SONAR_HOST_URL = "http://host.docker.internal:9000"
+        SONAR_HOST_URL = "http://sonarqube:9000"
     }
 
     stages {
