@@ -31,12 +31,10 @@ pipeline {
                     reuseNode true
                 }
             }
-            stage('Upload de codigo a sonnarqube'){
-                steps{
-                    whitSonarQubeEnv('SonarQube')
+            steps {
+                withSonarQubeEnv('SonarQube') {
                     sh 'sonar-scanner'
                 }
-
             }
         }
 
@@ -59,4 +57,3 @@ pipeline {
         }
     }
 }
- 
