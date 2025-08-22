@@ -69,6 +69,13 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "src/main\\.ts$",
+      ".*\\.spec\\.ts$",
+      "src/config/configuration\\.ts$"
+    ],
     "testEnvironment": "node"
   }
 }
+

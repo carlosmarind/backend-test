@@ -40,11 +40,28 @@ pipeline {
                     reuseNode true
                 }
             }
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh 'sonar-scanner'
+            stage('upload de codigo a sonarqube')
+            {
+                steps {
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'sonar-scanner'
+                    }
                 }
             }
+            // stage('Quality Gate')
+            // {
+            //     steps {
+            //         timeout(time: 30, unit: 'SECONDS'){
+            //             script {
+            //                 def gp=waitForQualityGate()
+            //                 if (gp.satus !='OK')
+            //                 {
+            //                     error  "Quality Gate falled whit status: ${gp.status}"
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
         }
 
         stage('Empaquetado y push Docker') {
