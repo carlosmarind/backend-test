@@ -14,7 +14,7 @@ pipeline {
     }
 
     stages {
-        stage('Instalación de dependencias') {
+        stage('Instalación de dependencias..') {
             steps {
                 sh 'npm install'
             }
@@ -50,23 +50,17 @@ pipeline {
         stage('Empaquetado y push Docker') {
             steps {
                 script {
-                    // Limpieza local de imágenes viejas
+                    // Limpiar imágenes antiguas
                     sh """
                         docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
-                        | sort -r | tail -n +$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f
+                        | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
                     """
 
                     // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
-                        
-                        // Evitar AlreadyExists: eliminar tags locales previos
-                        sh "docker rmi -f ${IMAGE_NAME}:ebl || true"
-                        sh "docker rmi -f ${IMAGE_NAME}:latest || true"
-
-                        app.push("${BUILD_TAG}")
                         app.push("ebl")
-                        app.push("latest")
+                        app.push()
                     }
 
                     // Determinar host de Nexus según entorno
@@ -79,12 +73,10 @@ pipeline {
 
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
                         // Tag único en Nexus
-                        sh "docker rmi -f ${nexusHost}:8082/${IMAGE_NAME}:ebl || true"
-                        sh "docker rmi -f ${nexusHost}:8082/${IMAGE_NAME}:latest || true"
-
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
 
+                        // Actualiza tag ebl / latest en Nexus
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:latest"
                     }
