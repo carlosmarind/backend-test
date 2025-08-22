@@ -17,30 +17,30 @@ describe('OperacionesService', () => {
   });
 
   it('should perform sum correctly', () => {
-    expect(service.operar('suma', 2, 3)).toBe(5);
+    expect(service.operar(2, 3, 'suma')).toBe(5);
   });
 
   it('should perform subtraction correctly', () => {
-    expect(service.operar('resta', 5, 3)).toBe(2);
+    expect(service.operar(5, 3, 'resta')).toBe(2);
   });
 
   it('should perform multiplication correctly', () => {
-    expect(service.operar('multiplicacion', 2, 3)).toBe(6);
+    expect(service.operar(2, 3, 'multiplicacion')).toBe(6);
   });
 
   it('should perform division correctly', () => {
-    expect(service.operar('division', 6, 3)).toBe(2);
+    expect(service.operar(6, 3, 'division')).toBe(2);
   });
 
   it('should return NaN when dividing by zero', () => {
-    expect(service.operar('division', 6, 0)).toBeNaN();
+    expect(service.operar(6, 0, 'division')).toBeNaN();
   });
 
   it('should return 0 when numerator is 0', () => {
-    expect(service.operar('division', 0, 5)).toBe(0);
+    expect(service.operar(0, 5, 'division')).toBe(0);
   });
 
   it('should return undefined for unknown operation', () => {
-    expect(service.operar('unknown', 1, 1)).toBeUndefined();
+    expect(service.operar(1, 1, 'unknown')).toBeUndefined();
   });
 });
