@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'node:18'
+            image 'edgardobenavidesl/node-with-docker-cli:22'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
@@ -9,11 +9,25 @@ pipeline {
 
     environment {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
-        SONAR_HOST_URL = "http://sonarqube:9000"  // Ajusta si usas otro host
-        SONAR_SCANNER_IMAGE = "sonarsource/sonar-scanner-cli:latest"
+        BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
+        MAX_IMAGES_TO_KEEP = 5
+        SONAR_HOST_URL = "http://host.docker.internal:9000"
     }
 
     stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout([$class: 'GitSCM',
+                    branches: [[name: 'dev']],
+                    doGenerateSubmoduleConfigurations: false,
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/EdgardoBenavides/backend-test.git',
+                        credentialsId: 'Githubpas'
+                    ]]
+                ])
+            }
+        }
 
         stage('Instalación de dependencias') {
             steps {
@@ -21,37 +35,38 @@ pipeline {
             }
         }
 
-        stage('Pruebas + Cobertura') {
+        stage('Ejecución de pruebas automatizadas') {
             steps {
-                sh 'npm run test:cov' // Genera coverage/lcov.info
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'coverage/**', allowEmptyArchive: true
-                }
+                sh 'npm run test:cov'
             }
         }
 
-        stage('Análisis SonarQube') {
+        stage('Construcción de aplicación') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    script {
-                        docker.image(SONAR_SCANNER_IMAGE).inside('--network dockercompose_devnet') {
-                            sh '''
-                                sonar-scanner \
-                                  -Dsonar.projectKey=backend-test \
-                                  -Dsonar.projectName=backend-nest \
-                                  -Dsonar.projectVersion=2.0.0 \
-                                  -Dsonar.sources=src \
-                                  -Dsonar.exclusions=node_modules/**,coverage/**,src/**/*.spec.ts,src/config/configuration.ts \
-                                  -Dsonar.tests=src \
-                                  -Dsonar.test.inclusions=src/**/*.spec.ts \
-                                  -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                  -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
-                                  -Dsonar.sourceEncoding=UTF-8 \
-                                  -Dsonar.verbose=false
-                            '''
-                        }
+                sh 'npm run build'
+            }
+        }
+
+        stage('Quality Assurance') {
+            agent {
+                docker {
+                    image 'sonarsource/sonar-scanner-cli'
+                    args '-v $WORKSPACE:/usr/src'
+                    reuseNode true
+                }
+            }
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            sonar-scanner \
+                            -Dsonar.projectKey=backend-test \
+                            -Dsonar.sources=. \
+                            -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
+                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                            -Dsonar.host.url=${SONAR_HOST_URL} \
+                            -Dsonar.qualitygate.wait=true
+                        """
                     }
                 }
             }
@@ -59,35 +74,60 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 3, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+                timeout(time: 10, unit: 'MINUTES') {
+                    script {
+                        def gate = waitForQualityGate()
+                        if (gate.status != 'OK') {
+                            error "Quality Gate failed with status: ${gate.status}"
+                        }
+                    }
                 }
             }
         }
 
-        stage('Construcción Docker') {
+        stage('Empaquetado y push Docker') {
             steps {
                 script {
-                    def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
+                    // Limpiar imágenes antiguas
+                    sh """
+                        docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
+                        | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
+                    """
+
+                    // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        app.push()
-                        app.push("latest")
+                        def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
+
+                        sh "docker rmi ${IMAGE_NAME}:ebl || true"
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
+
+                        app.push("${BUILD_TAG}")
+                        sh "docker push ${IMAGE_NAME}:ebl"
+                    }
+
+                    // Nexus
+                    def nexusHost = sh(
+                        script: 'ping -c 1 nexus >/dev/null 2>&1 && echo "nexus" || echo "localhost"',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Usando Nexus host: ${nexusHost}"
+
+                    docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
+                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
+
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
+                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                     }
                 }
             }
         }
+    }
 
-        stage('Push a Nexus') {
-            steps {
-                script {
-                    docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} localhost:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} localhost:8082/${IMAGE_NAME}:latest"
-                        sh "docker push localhost:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
-                        sh "docker push localhost:8082/${IMAGE_NAME}:latest"
-                    }
-                }
-            }
+    post {
+        always {
+            echo 'Pipeline finalizado'
         }
     }
 }
