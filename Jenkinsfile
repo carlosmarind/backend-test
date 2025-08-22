@@ -1,11 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'edgardobenavidesl/node-with-docker-cli:22'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-            reuseNode true
-        }
-    }
+    agent any
 
     environment {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
@@ -15,19 +9,19 @@ pipeline {
     }
 
     stages {
-        // stage('Checkout SCM') {
-        //     steps {
-        //         checkout([$class: 'GitSCM',
-        //             branches: [[name: 'main']],
-        //             doGenerateSubmoduleConfigurations: false,
-        //             extensions: [],
-        //             userRemoteConfigs: [[
-        //                 url: 'https://github.com/EdgardoBenavides/backend-test.git',
-        //                 credentialsId: 'Githubpas'
-        //             ]]
-        //         ])
-        //     }
-        // }
+        stage('Checkout SCM') {
+            steps {
+                checkout([$class: 'GitSCM',
+                    branches: [[name: 'main']],
+                    doGenerateSubmoduleConfigurations: false,
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/EdgardoBenavides/backend-test.git',
+                        credentialsId: 'Githubpas'
+                    ]]
+                ])
+            }
+        }
 
         stage('Instalación de dependencias') {
             steps {
@@ -35,9 +29,16 @@ pipeline {
             }
         }
 
-        stage('Ejecución de pruebas automatizadas') {
+        stage('Ejecución de pruebas y cobertura') {
+            agent {
+                docker {
+                    image 'node:22'
+                    args "-v $WORKSPACE:/usr/src -w /usr/src"
+                }
+            }
             steps {
-                sh 'npm run test:cov'
+                sh 'npm install'         // asegura dependencias dentro del contenedor
+                sh 'npm run test:cov'    // genera coverage/lcov.info
             }
         }
 
@@ -51,23 +52,21 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    args '-v $WORKSPACE:/usr/src'
-                    reuseNode true
+                    args "-v $WORKSPACE:/usr/src -w /usr/src"
                 }
             }
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                            sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=. \
-                            -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.qualitygate.wait=true
-                        """
-                    }
+                withSonarQubeEnv('SonarQube') {
+                    sh """
+                        sonar-scanner \
+                        -Dsonar.projectKey=backend-test \
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions=node_modules/**,dist/** \
+                        -Dsonar.coverage.exclusions=src/**/*.spec.ts \
+                        -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.qualitygate.wait=true
+                    """
                 }
             }
         }
@@ -97,10 +96,8 @@ pipeline {
                     // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
-
                         sh "docker rmi ${IMAGE_NAME}:ebl || true"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
-
                         app.push("${BUILD_TAG}")
                         sh "docker push ${IMAGE_NAME}:ebl"
                     }
@@ -116,7 +113,6 @@ pipeline {
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
-
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                     }
