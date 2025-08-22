@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'edgardobenavidesl/node-with-docker-cli:22'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
+            args '-v /var/run/docker.sock:/var/run/docker.sock --network=jenkins-sonar-network'
             reuseNode true
         }
     }
@@ -11,12 +11,13 @@ pipeline {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
+        SONAR_HOST_URL = "http://sonarqube:9000" // Hostname de SonarQube en la red Docker
     }
 
     stages {
         stage('Instalación de dependencias') {
             steps {
-                sh 'npm ci' // más rápido que npm install
+                sh 'npm ci'
             }
         }
 
@@ -36,27 +37,28 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    args '-v $WORKSPACE:/usr/src'
+                    args '-v $WORKSPACE:/usr/src --network=jenkins-sonar-network'
                     reuseNode true
                 }
             }
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh '''
+                    sh """
                         sonar-scanner \
                         -Dsonar.projectKey=backend-test \
                         -Dsonar.sources=. \
                         -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
                         -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
                         -Dsonar.qualitygate.wait=true
-                    '''
+                    """
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') { // optimizado
+                timeout(time: 5, unit: 'MINUTES') { // optimizado
                     script {
                         def gate = waitForQualityGate()
                         if (gate.status != 'OK') {
@@ -79,11 +81,8 @@ pipeline {
                     // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
-
-                        // Etiquetar como 'ebl' antes de push
                         sh "docker rmi ${IMAGE_NAME}:ebl || true"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
-
                         app.push("${BUILD_TAG}")
                         sh "docker push ${IMAGE_NAME}:ebl"
                     }
@@ -99,7 +98,6 @@ pipeline {
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
-
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                         sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
                     }
