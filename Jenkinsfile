@@ -1,8 +1,9 @@
 pipeline {
     agent {
-        docker { 
-            image 'node:22' 
-            args '-u 0:0' // Ejecutar como root para permisos de instalación
+        docker {
+            image 'edgardobenavidesl/node-with-docker-cli:22'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+            reuseNode true
         }
     }
 
@@ -10,17 +11,31 @@ pipeline {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
-        SONAR_HOST_URL = "http://sonarqube:9000"
+        SONAR_HOST_URL = "http://host.docker.internal:9000"
     }
 
     stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout([$class: 'GitSCM',
+                    branches: [[name: 'dev']],
+                    doGenerateSubmoduleConfigurations: false,
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/EdgardoBenavides/backend-test.git',
+                        credentialsId: 'Githubpas'
+                    ]]
+                ])
+            }
+        }
+
         stage('Instalación de dependencias') {
             steps {
                 sh 'npm ci'
             }
         }
 
-        stage('Ejecución de pruebas y cobertura') {
+        stage('Ejecución de pruebas automatizadas') {
             steps {
                 sh 'npm run test:cov'
             }
@@ -33,19 +48,26 @@ pipeline {
         }
 
         stage('Quality Assurance') {
+            agent {
+                docker {
+                    image 'sonarsource/sonar-scanner-cli'
+                    args '-v $WORKSPACE:/usr/src'
+                    reuseNode true
+                }
+            }
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh """
-                        npx sonar-scanner \
-                        -Dsonar.projectKey=backend-test \
-                        -Dsonar.sources=src \
-                        -Dsonar.tests=src \
-                        -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info \
-                        -Dsonar.coverage.exclusions=src/**/*.spec.ts \
-                        -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
-                        -Dsonar.host.url=${SONAR_HOST_URL} \
-                        -Dsonar.qualitygate.wait=true
-                    """
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            sonar-scanner \
+                            -Dsonar.projectKey=backend-test \
+                            -Dsonar.sources=. \
+                            -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
+                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                            -Dsonar.host.url=${SONAR_HOST_URL} \
+                            -Dsonar.qualitygate.wait=true
+                        """
+                    }
                 }
             }
         }
@@ -75,7 +97,10 @@ pipeline {
                     // Docker Hub
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
+
+                        sh "docker rmi ${IMAGE_NAME}:ebl || true"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
+
                         app.push("${BUILD_TAG}")
                         sh "docker push ${IMAGE_NAME}:ebl"
                     }
@@ -86,11 +111,14 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
+                    echo "Usando Nexus host: ${nexusHost}"
+
                     docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
-                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
-                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:ebl"
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
+
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${nexusHost}:8082/${IMAGE_NAME}:latest"
+                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:latest"
                     }
                 }
             }
