@@ -46,31 +46,62 @@ pipeline {
             }
         }
 
-        stage('Empaquetado y push Docker') {
-            steps {
-                script {
-                    // Docker Hub
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        // Build con tag único
-                        def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
-                        
-                        // Etiqueta como ebl y push
-                        app.push("ebl")
-                        app.push()
-                    }
+stage('Empaquetado y push Docker') {
+    steps {
+        script {
+            // Docker Hub
+            docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
+                def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
+                app.push("ebl")
+                app.push()
+            }
 
-                    // Nexus
-                    docker.withRegistry('http://nexus:8082', 'nexus-credentials') {
-                        // Tag único en Nexus
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} nexus:8082/${IMAGE_NAME}:${BUILD_TAG}"
-                        sh "docker push nexus:8082/${IMAGE_NAME}:${BUILD_TAG}"
+            // Determinar host de Nexus según entorno
+            def nexusHost = sh(
+                script: 'ping -c 1 nexus >/dev/null 2>&1 && echo "nexus" || echo "localhost"',
+                returnStdout: true
+            ).trim()
 
-                        // Actualiza tag ebl en Nexus
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} nexus:8082/${IMAGE_NAME}:ebl"
-                        sh "docker push nexus:8082/${IMAGE_NAME}:latest"
-                    }
-                }
+            echo "Usando Nexus host: ${nexusHost}"
+
+            docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
+                // Tag único en Nexus
+                sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
+                sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_TAG}"
+
+                // Actualiza tag ebl / latest en Nexus
+                sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${nexusHost}:8082/${IMAGE_NAME}:ebl"
+                sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:latest"
             }
         }
+    }
+}
+
+        // stage('Empaquetado y push Docker') {
+        //     steps {
+        //         script {
+        //             // Docker Hub
+        //             docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
+        //                 // Build con tag único
+        //                 def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
+                        
+        //                 // Etiqueta como ebl y push
+        //                 app.push("ebl")
+        //                 app.push()
+        //             }
+
+        //             // Nexus
+        //             docker.withRegistry('http://nexus:8082', 'nexus-credentials') {
+        //                 // Tag único en Nexus
+        //                 sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} nexus:8082/${IMAGE_NAME}:${BUILD_TAG}"
+        //                 sh "docker push nexus:8082/${IMAGE_NAME}:${BUILD_TAG}"
+
+        //                 // Actualiza tag ebl en Nexus
+        //                 sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} nexus:8082/${IMAGE_NAME}:ebl"
+        //                 sh "docker push nexus:8082/${IMAGE_NAME}:ebl"
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
