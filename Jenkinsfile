@@ -25,17 +25,17 @@ pipeline {
         }
 
         stage('Quality Assurance') {
-            agent {
-                docker {
-                    image 'sonarsource/sonar-scanner-cli'
-                    args '-v $WORKSPACE:$WORKSPACE -w $WORKSPACE'
-                }
-            }
             steps {
-                dir("$WORKSPACE") {
-                    withSonarQubeEnv('SonarQube') {
-                        sh 'sonar-scanner -Dsonar.host.url=http://sonarqube:9000'
-                    }
+                withSonarQubeEnv('SonarQube') { // Nombre de la instalación que configuraste en Jenkins
+                    sh """
+                        sonar-scanner \
+                        -Dsonar.projectKey=backend-test \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.test.inclusions=src/**/*.spec.ts \
+                        -Dsonar.host.url=http://sonarqube:9000 \
+                        -Dsonar.login=${SONAR_TOKEN}
+                    """
                 }
             }
         }
