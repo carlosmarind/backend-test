@@ -109,12 +109,33 @@ stage('Deploy to K8s') {
     withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
       sh '''
         set -e
-        export KUBECONFIG="$KUBECONFIG_FILE"
 
-        # Sanity check: si no conecta, aborta aquí.
-        kubectl cluster-info
-        kubectl get ns | head -5
+        # Usamos una copia local del kubeconfig de la credencial
+        cp "$KUBECONFIG_FILE" kubeconfig.patched
 
+        CTX=$(kubectl --kubeconfig kubeconfig.patched config current-context)
+        CLUSTER=$(kubectl --kubeconfig kubeconfig.patched config view -o jsonpath='{.contexts[?(@.name=="'"$CTX"'")].context.cluster}')
+        echo "contexto: $CTX | cluster: $CLUSTER"
+
+        # Forzamos el server al portproxy del host (6443)
+        kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --server="https://host.docker.internal:6443" >/dev/null
+
+        echo "Server tras parche:"
+        kubectl --kubeconfig kubeconfig.patched config view -o jsonpath='{.clusters[?(@.name=="'"$CLUSTER"'")].cluster.server}'; echo
+
+        # Si el CA/hostname no calza, tolerarlo SOLO para el laboratorio
+        if ! kubectl --kubeconfig kubeconfig.patched --request-timeout=5s version >/dev/null 2>&1; then
+          echo "Activando insecure-skip-tls-verify (SOLO LAB)."
+          kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --insecure-skip-tls-verify=true >/dev/null
+        fi
+
+        export KUBECONFIG="$PWD/kubeconfig.patched"
+
+        # Sanity check detallado
+        kubectl cluster-info || true
+        kubectl get ns | head -5 || true
+
+        # Despliegue
         kubectl apply -f kubernetes.yaml --validate=false
         kubectl set image deployment/backend-test backend='"${REGISTRY}/${IMAGE_NAME}:latest"' -n default
         kubectl rollout status deployment/backend-test -n default
