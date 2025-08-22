@@ -60,22 +60,26 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
+    "rootDir": ".",
+    "testMatch": [
+      "<rootDir>/src/**/*.spec.ts"
+    ],
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "collectCoverage": true,
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.{ts,js}",
+      "!src/main.ts",
+      "!src/**/*.module.ts",
+      "!src/**/*.spec.ts",
+      "!src/config/configuration.ts",
+      "!src/coverage/**"
     ],
-    "coverageDirectory": "../coverage",
-    "coveragePathIgnorePatterns": [
-    "/node_modules/",
-    "src/main\\.ts$",
-    ".*\\.spec\\.ts$",
-    "src/config/configuration\\.ts$",
-    "src/app\\.module\\.ts$",
-    "src/tareas/tareas\\.module\\.ts$"
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "lcov",
+      "text"
     ],
     "testEnvironment": "node"
   }
