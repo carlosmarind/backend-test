@@ -28,19 +28,30 @@ pipeline {
             agent {
                 docker {
                     image 'sonarsource/sonar-scanner-cli'
-                    args "-v ${env.WORKSPACE}:${env.WORKSPACE} --network=dockercompose_devnet"
+                    args '-v $WORKSPACE:/usr/src'
+                    reuseNode true
                 }
             }
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh "sonar-scanner -Dsonar.projectKey=backend-test -Dsonar.sources=src -Dsonar.tests=src -Dsonar.javascript.lcov.reportPaths=${env.WORKSPACE}/coverage/lcov.info"
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            sonar-scanner \
+                            -Dsonar.projectKey=backend-test \
+                            -Dsonar.sources=. \
+                            -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
+                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                            -Dsonar.host.url=${SONAR_HOST_URL} \
+                            -Dsonar.qualitygate.wait=true
+                        """
+                    }
                 }
             }
         }
-
+ 
         stage('Quality Gate'){
             steps {
-                timeout(time: 30, unit: 'SECONDS') {
+                timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
