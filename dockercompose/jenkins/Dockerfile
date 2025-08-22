@@ -9,6 +9,7 @@ RUN jenkins-plugin-cli -f /usr/share/jenkins/plugins.txt
 
 USER root
 
+# Instalar Docker CLI
 RUN apt-get update && apt-get install -y \
     ca-certificates curl gnupg lsb-release sudo bash \
  && install -m 0755 -d /etc/apt/keyrings \
