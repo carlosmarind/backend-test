@@ -11,9 +11,7 @@ pipeline {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
-        // URL de SonarQube en el host
-        SONAR_HOST_URL = "http://host.docker.internal:9000" // si Jenkins está en Windows/Mac
-        // SONAR_HOST_URL = "http://localhost:9000" // si Jenkins está en Linux con Docker
+        SONAR_HOST_URL = "http://host.docker.internal:9000" // <-- cambio aquí
     }
 
     stages {
@@ -84,6 +82,7 @@ pipeline {
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
                         def app = docker.build("${IMAGE_NAME}:${BUILD_TAG}")
 
+                        // Etiquetar como 'ebl' antes de push
                         sh "docker rmi ${IMAGE_NAME}:ebl || true"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_TAG} ${IMAGE_NAME}:ebl"
 
