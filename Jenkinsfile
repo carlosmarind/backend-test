@@ -58,27 +58,28 @@ stage('Testing + Coverage') {
       }
     }
 
-    stage('SonarQube Scan') {
-      steps {
-        script {
-          def scannerHome = tool 'SonarScanner'  // Global Tool: SonarQube Scanner
-          withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
-            withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-              sh """
-                export SONAR_TOKEN="$SONAR_TOKEN"
-                "${scannerHome}/bin/sonar-scanner" \
-                  -Dsonar.host.url="$SONAR_HOST_URL" \
-                  -Dsonar.projectKey='${SONAR_PROJECT_KEY}' \
-                  -Dsonar.sources=src \
-                  -Dsonar.tests=src \
-                  -Dsonar.test.inclusions=**/*.test.* \
-                  -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-              """
-            }
-          }
+stage('SonarQube Scan') {
+  steps {
+    script {
+      def scannerHome = tool 'SonarScanner'
+      withSonarQubeEnv("${env.SONARQUBE_SERVER}") {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+          sh """
+            export SONAR_TOKEN="$SONAR_TOKEN"
+            "${scannerHome}/bin/sonar-scanner" \
+              -Dsonar.host.url="$SONAR_HOST_URL" \
+              -Dsonar.projectKey='${SONAR_PROJECT_KEY}' \
+              -Dsonar.projectName='${SONAR_PROJECT_KEY}' \
+              -Dsonar.sources=src \
+              -Dsonar.tests=src \
+              -Dsonar.test.inclusions=**/*.spec.ts \
+              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+          """
         }
       }
     }
+  }
+}
 
  stage('Quality Gate') {
   steps {
