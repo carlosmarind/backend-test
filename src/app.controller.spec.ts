@@ -43,7 +43,7 @@ it('/ (GET)', async () => {
   it('/validate-rut valido (GET)', async () => {
     await request(app.getHttpServer())
       .get('/validate-rut?rut=11111111-1')
-      .expect(400)
+      .expect(200)
       .expect({ mensaje: 'rut valido' });
   });
 
