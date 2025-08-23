@@ -12,37 +12,26 @@ pipeline {
             }
         }
 
-        stage('Instalar dependencias') {
-            steps {
-                script {
-                    docker.image('node:22').inside {
+        stage('Etapa  de construccion / build') {
+            agent {
+                docker {
+                     image 'node:22'
+                     reuseNode true 
+                }
+            }
+            stages {
+                stage('Instalacion de dependencias') {
+                    steps {
                         sh 'npm install'
                     }
                 }
-            }
-        }
-
-        stage('Testing con cobertura') {
-            steps {
-                script {
-                    docker.image('node:22').inside {
-                        sh 'mkdir -p test-results'
-                        sh 'npm test -- --coverage'
+                stage('Ejecucion de pruebas automatizadas') {
+                    steps {
+                        sh 'npm run test:cov'
                     }
                 }
-            }
-            post {
-                always {
-                    junit 'test-results/junit.xml'
-                }
-            }
-        }
-
-
-        stage('Build') {
-            steps {
-                script {
-                    docker.image('node:22').inside {
+                stage('Construccion de aplicacion') {
+                    steps {
                         sh 'npm run build'
                     }
                 }
