@@ -17,6 +17,7 @@ pipeline {
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
         SONAR_HOST_URL = "http://host.docker.internal:8084"
+        SONAR_TOKEN = credentials('jenkins-token') // <-- Token SonarQube
     }
 
     stages {
@@ -69,6 +70,7 @@ pipeline {
                         -Dsonar.exclusions=node_modules/**,dist/** \
                         -Dsonar.coverage.exclusions=**/*.spec.ts \
                         -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.login=${SONAR_TOKEN} \
                         -Dsonar.qualitygate.wait=true'
                 }
             }
