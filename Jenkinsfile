@@ -2,20 +2,27 @@ pipeline {
     agent any
 
     stages {
+        stage('Dependencies') {
+			agent{
+				docker{
+					image 'node:22'
+					reuseNode true
+				}
+			}
+            steps {
+                sh 'npm install'
+            }
+        }
+        stage('Preliminary Testing') {
+            steps {
+                echo 'npm run test:cov'
+            }
+        }
         stage('Build') {
             steps {
-                echo 'Building..'
+                sh 'RUN npm run build'
             }
         }
-        stage('Test') {
-            steps {
-                echo 'Testing..'
-            }
-        }
-        stage('Deploy') {
-            steps {
-                echo 'Deploying....'
-            }
-        }
+		
     }
 }
