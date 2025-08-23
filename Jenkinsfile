@@ -110,20 +110,21 @@ stage('Deploy to K8s') {
       sh '''
         set -e
 
-        # Usamos una copia local del kubeconfig de la credencial
+        # 0) Usamos una copia local del kubeconfig de la credencial
         cp "$KUBECONFIG_FILE" kubeconfig.patched
 
+        # 1) Detectamos contexto/cluster
         CTX=$(kubectl --kubeconfig kubeconfig.patched config current-context)
         CLUSTER=$(kubectl --kubeconfig kubeconfig.patched config view -o jsonpath='{.contexts[?(@.name=="'"$CTX"'")].context.cluster}')
         echo "contexto: $CTX | cluster: $CLUSTER"
 
-        # Forzamos el server al portproxy del host (6443)
+        # 2) Forzamos el API server al portproxy del host (6443)
         kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --server="https://host.docker.internal:6443" >/dev/null
 
         echo "Server tras parche:"
         kubectl --kubeconfig kubeconfig.patched config view -o jsonpath='{.clusters[?(@.name=="'"$CLUSTER"'")].cluster.server}'; echo
 
-        # Si el CA/hostname no calza, tolerarlo SOLO para el laboratorio
+        # 3) Si el CA/hostname no calza, tolerarlo SOLO para el laboratorio
         if ! kubectl --kubeconfig kubeconfig.patched --request-timeout=5s version >/dev/null 2>&1; then
           echo "Activando insecure-skip-tls-verify (SOLO LAB)."
           kubectl --kubeconfig kubeconfig.patched config set-cluster "$CLUSTER" --insecure-skip-tls-verify=true >/dev/null
@@ -131,14 +132,33 @@ stage('Deploy to K8s') {
 
         export KUBECONFIG="$PWD/kubeconfig.patched"
 
-        # Sanity check detallado
+        # 4) Sanity check rápido
         kubectl cluster-info || true
         kubectl get ns | head -5 || true
 
-        # Despliegue
+        # 5) Aplicamos manifiestos (sin validar OpenAPI)
         kubectl apply -f kubernetes.yaml --validate=false
-        kubectl set image deployment/backend-test backend='"${REGISTRY}/${IMAGE_NAME}:latest"' -n default
-        kubectl rollout status deployment/backend-test -n default
+
+        # 6) Elegimos tag inmutable para evitar problemas de cacheo (en vez de :latest)
+        TARGET_IMAGE=${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}
+        echo "Actualizando deployment/backend-test a la imagen: ${TARGET_IMAGE}"
+
+        # 7) Actualizamos la imagen (sin comillas que rompan la expansión)
+        kubectl -n default set image deployment/backend-test backend=${TARGET_IMAGE}
+
+        # 8) Esperamos el rollout con timeout y diagnóstico automático si falla
+        if ! kubectl -n default rollout status deployment/backend-test --timeout=180s; then
+          echo "Rollout NO completó. Mostrando diagnóstico..."
+          kubectl -n default get deploy backend-test -o wide || true
+          kubectl -n default get rs -l app=backend-test -o wide || true
+          kubectl -n default get pods -l app=backend-test \
+            -o custom-columns=NAME:.metadata.name,PHASE:.status.phase,READY:.status.containerStatuses[0].ready,REASON:.status.containerStatuses[0].state.waiting.reason,IMAGE:.spec.containers[0].image --no-headers || true
+          kubectl -n default describe deploy/backend-test || true
+          kubectl -n default describe rs -l app=backend-test || true
+          POD=$(kubectl -n default get pods -l app=backend-test -o jsonpath='{.items[?(@.status.containerStatuses[0].ready==false)].metadata.name}' 2>/dev/null || true)
+          [ -n "$POD" ] && kubectl -n default logs "$POD" --tail=200 || true
+          exit 1
+        fi
       '''
     }
   }
