@@ -33,8 +33,11 @@ pipeline {
       }
     }
 
-   stage('Testing + Coverage') {
-  environment { JEST_JUNIT_OUTPUT = 'junit-report.xml' }
+stage('Testing + Coverage') {
+  environment {
+    JEST_JUNIT_OUTPUT_DIR = '.'
+    JEST_JUNIT_OUTPUT_NAME = 'junit-report.xml'
+  }
   steps {
     sh '''
       npm test -- --coverage --reporters=default --reporters=jest-junit
@@ -169,12 +172,15 @@ stage('Deploy to K8s') {
 
   }
 
-  post {
-    always {
-      // Evita fallo si docker no está disponible por cualquier motivo
-      sh 'command -v docker >/dev/null 2>&1 && docker logout ${REGISTRY} || true'
-      junit allowEmptyResults: true, testResults: 'junit-report*.xml'
-      archiveArtifacts artifacts: 'coverage/**/*, build/**/*', allowEmptyArchive: true
-    }
+post {
+  always {
+    sh 'command -v docker >/dev/null 2>&1 && docker logout ${REGISTRY} || true'
+
+    // Busca cualquier junit*.xml en el workspace
+    junit allowEmptyResults: true, testResults: 'junit*.xml'
+
+    // Nest compila a dist/, no a build/
+    archiveArtifacts artifacts: 'coverage/**/*, dist/**/*', allowEmptyArchive: true
   }
+}
 }
