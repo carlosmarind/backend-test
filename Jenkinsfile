@@ -22,6 +22,7 @@ pipeline {
                     export JEST_JUNIT_OUTPUT_DIR=reports
                     export JEST_JUNIT_OUTPUT_NAME=junit.xml
                     export JEST_JUNIT_SUITE_NAME=backend-test
+                    export JEST_JUNIT_SONAR_GENERIC=true
                     npm run test:cov
                 '''
             }
