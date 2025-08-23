@@ -43,26 +43,21 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-    withSonarQubeEnv('SonarQube') { // <- nombre exacto de tu servidor en Jenkins
-        sh """
-            sonar-scanner \
-            -Dsonar.projectKey=backend-test \
-            -Dsonar.sources=src \
-            -Dsonar.tests=src \
-            -Dsonar.test.inclusions=**/*.spec.ts \
-            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-            -Dsonar.exclusions=node_modules/**,dist/** \
-            -Dsonar.coverage.exclusions=**/*.spec.ts
-        """
-    }
-}
-
-stage('Quality Gate') {
-    timeout(time: 10, unit: 'MINUTES') {
-        waitForQualityGate abortPipeline: true
-    }
-}
-
+            steps {
+                withSonarQubeEnv('SonarQube') { // nombre del servidor SonarQube en Jenkins
+                    sh """
+                        sonar-scanner \
+                        -Dsonar.projectKey=backend-test \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.test.inclusions=**/*.spec.ts \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.exclusions=node_modules/**,dist/** \
+                        -Dsonar.coverage.exclusions=**/*.spec.ts
+                    """
+                }
+            }
+        }
 
         stage('Quality Gate') {
             steps {
