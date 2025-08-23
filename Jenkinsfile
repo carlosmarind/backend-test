@@ -33,13 +33,14 @@ pipeline {
       }
     }
 
-    stage('Testing + Coverage') {
-      environment { JEST_JUNIT_OUTPUT = 'junit-report.xml' } // requiere jest-junit (opcional)
-      steps {
-        // Si no tienes jest-junit aún, puedes dejar solo: npm test -- --coverage
-        sh 'npm test -- --coverage --reporters=default --reporters=jest-junit || true'
-      }
-    }
+   stage('Testing + Coverage') {
+  environment { JEST_JUNIT_OUTPUT = 'junit-report.xml' }
+  steps {
+    sh '''
+      npm test -- --coverage --reporters=default --reporters=jest-junit
+    '''
+  }
+}
 
     stage('Build app') {
       steps {
