@@ -46,8 +46,7 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                        npm install -g sonar-scanner
-                        sonar-scanner \
+                        npx sonar-scanner \
                         -Dsonar.projectKey=backend-test \
                         -Dsonar.sources=src \
                         -Dsonar.tests=src \
