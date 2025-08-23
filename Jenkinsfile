@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'cimg/node:22.2.0'
-            args '-v /var/run/docker.sock:/var/run/docker.sock --network devnet'
+            args '--network devnet -v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
     }
@@ -15,7 +15,7 @@ pipeline {
         NEXUS_URL = "nexus_repo:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
-        SONAR_HOST_URL = "http://host.docker.internal:8084"
+        SONAR_HOST_URL = "http://sonarqube:9000"
     }
 
     stages {
@@ -43,6 +43,16 @@ pipeline {
         stage('Build aplicación') {
             steps {
                 sh 'npm run build'
+            }
+        }
+
+        stage('Debug Sonar connectivity') {
+            steps {
+                sh '''
+                    echo "Verificando conectividad con SonarQube..."
+                    ping -c 3 sonarqube
+                    curl -v http://sonarqube:9000/api/ce/task?id=AZjW7334nHzWyVn2v4LF || true
+                '''
             }
         }
 
