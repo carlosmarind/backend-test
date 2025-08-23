@@ -55,9 +55,16 @@ pipeline {
         stage('Quality Assurance - SonarQube') {
             steps {
                 script {
-                    withSonarQubeEnv('SonarQube') {
-                        sh """#!/bin/bash
-                            npx sonarqube-scanner \
+                    // Volumen persistente para cache de SonarScanner
+                    def sonarCache = "${env.WORKSPACE}/.sonar/cache"
+
+                    // Crear directorio cache si no existe
+                    sh "mkdir -p ${sonarCache}"
+
+                    // Ejecutar SonarScanner desde contenedor con scanner preinstalado
+                    docker.image('sonarsource/sonar-scanner-cli:latest').inside("-v ${sonarCache}:/root/.sonar --network devnet") {
+                        sh """
+                            sonar-scanner \
                                 -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                                 -Dsonar.sources=src \
                                 -Dsonar.tests=src \
@@ -66,7 +73,7 @@ pipeline {
                                 -Dsonar.exclusions=node_modules/**,dist/** \
                                 -Dsonar.coverage.exclusions=**/*.spec.ts \
                                 -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.token=${SONAR_AUTH_TOKEN}
+                                -Dsonar.login=${SONAR_AUTH_TOKEN}
                         """
                     }
                 }
