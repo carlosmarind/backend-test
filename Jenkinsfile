@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'cimg/node:22.2.0'
-            args '--network dockercompose_devnet -v /var/run/docker.sock:/var/run/docker.sock'
+            args '--network devnet -v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
     }
@@ -78,17 +78,20 @@ pipeline {
         }
 
         stage('Quality Gate') {
-            steps {
-                timeout(time: 10, unit: 'MINUTES') {
-                    script {
-                        def gate = waitForQualityGate()
-                        if (gate.status != 'OK') {
-                            error "Quality Gate failed: ${gate.status}"
-                        }
-                    }
+    steps {
+        script {
+            echo "Esperando 15s para que SonarQube procese el análisis..."
+            sleep 15
+            timeout(time: 10, unit: 'MINUTES') {
+                def gate = waitForQualityGate()
+                if (gate.status != 'OK') {
+                    error "Quality Gate failed: ${gate.status}"
                 }
             }
         }
+    }
+}
+
 
         stage('Build & Push Docker Image') {
             steps {
