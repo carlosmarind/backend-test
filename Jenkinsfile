@@ -48,29 +48,42 @@ pipeline {
         }
 
         stage('Quality Assurance') {
-            agent {
-                docker {
-                    image 'sonarsource/sonar-scanner-cli'
-                    args '-v $WORKSPACE:/usr/src'
-                    reuseNode true
-                }
-            }
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                            sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=. \
-                            -Dsonar.exclusions=node_modules/**,dist/**
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.qualitygate.wait=true
-                        """
-                    }
+    agent {
+        docker {
+            image 'sonarsource/sonar-scanner-cli'
+            args '-v $WORKSPACE:/usr/src'
+            reuseNode true
+        }
+    }
+    steps {
+        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+            withSonarQubeEnv('SonarQube') {
+                script {
+                    // Normalizar separadores de ruta en lcov.info
+                    sh '''
+                        sed -i 's|\\\\|/|g' coverage/lcov.info
+                        mkdir -p /usr/src/coverage
+                        cp coverage/lcov.info /usr/src/coverage/lcov.info
+                    '''
+
+                    // Ejecutar análisis con cobertura
+                    sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=backend-test \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.test.inclusions=**/*.spec.ts \
+                        -Dsonar.javascript.lcov.reportPaths=/usr/src/coverage/lcov.info \
+                        -Dsonar.exclusions=node_modules/**,dist/** \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.qualitygate.wait=true
+                    '''
                 }
             }
         }
+    }
+}
+
 
         stage('Quality Gate') {
             steps {
