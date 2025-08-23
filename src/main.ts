@@ -1,11 +1,17 @@
+// src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 
-async function bootstrap() {
+export async function bootstrap() { // ✅ export agregado
   const app = await NestFactory.create(AppModule);
   await app.listen(process.env.PORT ?? 4000);
+
   const logger = new Logger('bootstrap');
   logger.log(`Listening on ${await app.getUrl()}`);
 }
-bootstrap().catch((e) => console.log(`Error al iniciar la aplicacion: ${e}`));
+
+// Solo ejecutar si es el archivo principal
+if (require.main === module) {
+  bootstrap().catch((e) => console.log(`Error al iniciar la aplicacion: ${e}`));
+}
