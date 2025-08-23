@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'cimg/node:22.2.0'
-            args '--network devnet -v /var/run/docker.sock:/var/run/docker.sock'
+            args '--network dockercompose_devnet -v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
     }
@@ -15,7 +15,7 @@ pipeline {
         NEXUS_URL = "nexus_repo:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
-        SONAR_HOST_URL = "http://sonarqube:9000"
+        SONAR_HOST_URL = "http://sonarqube:9000"  // dentro de devnet
         SONAR_AUTH_TOKEN = credentials('sonarqube-cred')
     }
 
@@ -47,11 +47,11 @@ pipeline {
             }
         }
 
-        stage('Debug Sonar connectivity') {
+        stage('Debug SonarQube connectivity') {
             steps {
                 sh '''
-                    echo "Verificando conectividad con SonarQube..."
-                    curl -sSf -u ${SONAR_AUTH_TOKEN}: ${SONAR_HOST_URL}/api/system/health || echo "No se pudo conectar a SonarQube"
+                    echo "Verificando conectividad con SonarQube en la red devnet..."
+                    curl -s -u ${SONAR_AUTH_TOKEN}: ${SONAR_HOST_URL}/api/system/health || echo "No se pudo conectar a SonarQube"
                 '''
             }
         }
