@@ -1,8 +1,9 @@
 pipeline {
     agent {
         docker {
-        image 'edgardobenavidesl/node-with-docker-cli:22'
-        args '-v /var/run/docker.sock:/var/run/docker.sock'
+            // Imagen con Node 22 + OpenJDK 17
+            image 'cimg/node:22.2.0' 
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
     }
@@ -15,23 +16,10 @@ pipeline {
         NEXUS_URL = "nexus:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
-        // SonarQube host actualizado con puerto correcto
         SONAR_HOST_URL = "http://host.docker.internal:8084"
     }
 
     stages {
-        // stage('Checkout SCM') {
-        //     steps {
-        //         checkout([$class: 'GitSCM',
-        //             branches: [[name: 'main']],
-        //             userRemoteConfigs: [[
-        //                 url: 'https://github.com/EdgardoBenavides/backend-test.git',
-        //                 credentialsId: 'Githubpas'
-        //             ]]
-        //         ])
-        //     }
-        // }
-
         stage('Instalación de dependencias') {
             steps {
                 sh 'npm ci'
@@ -60,34 +48,31 @@ pipeline {
         }
 
         stage('Quality Assurance - SonarQube') {
-    steps {
-        script {
-            echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
-            
-            sh '''
-                if [ ! -f coverage/lcov.info ]; then
-                    echo "ERROR: coverage/lcov.info NO existe!"
-                    exit 1
-                fi
-                echo "Resumen lcov.info (primeras 10 líneas):"
-                head -n 10 coverage/lcov.info
-                echo "Total de líneas en lcov.info: $(wc -l < coverage/lcov.info)"
-            '''
-
-            sh 'npx sonarqube-scanner \
-                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                -Dsonar.sources=src \
-                -Dsonar.tests=src \
-                -Dsonar.test.inclusions=**/*.spec.ts \
-                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                -Dsonar.exclusions=node_modules/**,dist/** \
-                -Dsonar.coverage.exclusions=**/*.spec.ts \
-                -Dsonar.host.url=${SONAR_HOST_URL} \
-                -Dsonar.qualitygate.wait=true'
+            steps {
+                script {
+                    echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
+                    sh '''
+                        if [ ! -f coverage/lcov.info ]; then
+                            echo "ERROR: coverage/lcov.info NO existe!"
+                            exit 1
+                        fi
+                        echo "Resumen lcov.info (primeras 10 líneas):"
+                        head -n 10 coverage/lcov.info
+                        echo "Total de líneas en lcov.info: $(wc -l < coverage/lcov.info)"
+                    '''
+                    sh 'npx sonarqube-scanner \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.test.inclusions=**/*.spec.ts \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.exclusions=node_modules/**,dist/** \
+                        -Dsonar.coverage.exclusions=**/*.spec.ts \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.qualitygate.wait=true'
+                }
+            }
         }
-    }
-}
-
 
         stage('Quality Gate') {
             steps {
@@ -105,15 +90,11 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 script {
-                    // Limpiar imágenes antiguas
                     sh """
                         docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
                         | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
                     """
-
                     def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
-
-                    // Push a Nexus con tags latest y BUILD_NUMBER
                     docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
@@ -123,18 +104,6 @@ pipeline {
                 }
             }
         }
-
-        // stage('Actualizar Kubernetes') {
-        //     steps {
-        //         sh '''
-        //             echo "Aplicando configuración de Kubernetes..."
-        //             kubectl --kubeconfig=${KUBE_CONFIG} apply -f ${DEPLOYMENT_FILE}
-        //
-        //             echo "Validando pods en ejecución..."
-        //             kubectl --kubeconfig=${KUBE_CONFIG} rollout status deployment/backend-app
-        //         '''
-        //     }
-        // }
     }
 
     post {
