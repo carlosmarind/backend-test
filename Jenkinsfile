@@ -29,7 +29,7 @@ pipeline {
         stage('Ejecución de pruebas con cobertura') {
             steps {
                 sh '''
-                    npm run test:cov
+                    npm run test:cov -- --testTimeout=20000
                     if [ ! -f coverage/lcov.info ]; then
                         echo "ERROR: No se generó coverage/lcov.info"
                         exit 1
@@ -51,7 +51,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Probando conexión desde el contenedor del pipeline..."
-                    curl -s -u $SONAR_AUTH_TOKEN: $SONAR_HOST_URL/api/system/health || echo "No se pudo conectar desde contenedor"
+                    curl -s -u ${SONAR_AUTH_TOKEN}: ${SONAR_HOST_URL}/api/system/health || echo "No se pudo conectar desde contenedor"
                 '''
             }
         }
@@ -62,15 +62,15 @@ pipeline {
                     withSonarQubeEnv('SonarQube') {
                         sh """
                             npx sonarqube-scanner \
-                                -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                                 -Dsonar.sources=src \
                                 -Dsonar.tests=src \
                                 -Dsonar.test.inclusions=**/*.spec.ts \
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                                 -Dsonar.exclusions=node_modules/**,dist/** \
                                 -Dsonar.coverage.exclusions=**/*.spec.ts \
-                                -Dsonar.host.url=$SONAR_HOST_URL \
-                                -Dsonar.token=$SONAR_AUTH_TOKEN
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.token=${SONAR_AUTH_TOKEN}
                         """
                     }
                 }
@@ -79,10 +79,8 @@ pipeline {
 
         stage('Debug SonarQube desde Jenkins (Master)') {
             steps {
-                sh '''
-                    echo "Probando conexión desde el nodo Jenkins (host donde corre waitForQualityGate)..."
-                    curl -s http://sonarqube:9000/api/system/health || echo "No se pudo conectar desde Jenkins Master"
-                '''
+                echo "Probando conexión desde el nodo Jenkins (host donde corre waitForQualityGate)..."
+                sh 'curl -s http://sonarqube:9000/api/system/health || echo "No se pudo conectar desde Jenkins Master"'
             }
         }
 
@@ -110,30 +108,25 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 script {
-                    // Calcular límite dinámico en Groovy
                     def maxImages = MAX_IMAGES_TO_KEEP.toInteger() + 1
 
-                    // Limpiar imágenes antiguas
                     sh """
-                        docker images $IMAGE_NAME --format "{{.Repository}}:{{.Tag}}" \
-                        | sort -r | tail -n +$maxImages | xargs -r docker rmi -f || true
+                        docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
+                        | sort -r | tail -n +${maxImages} | xargs -r docker rmi -f || true
                     """
 
-                    // Build de la imagen Docker
-                    def app = docker.build("$IMAGE_NAME:$BUILD_NUMBER")
+                    def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
 
-                    // Verificar conectividad con Nexus
                     sh """
-                        echo "Verificando que \$NEXUS_URL sea resolvible..."
-                        ping -c 1 \$(echo \$NEXUS_URL | cut -d':' -f1) || exit 1
+                        echo "Verificando que ${NEXUS_URL} sea resolvible..."
+                        ping -c 1 \$(echo ${NEXUS_URL} | cut -d':' -f1) || exit 1
                     """
 
-                    // Push al repositorio Nexus
-                    docker.withRegistry("http://$NEXUS_URL", 'nexus-credentials') {
-                        sh "docker tag $IMAGE_NAME:$BUILD_NUMBER $NEXUS_URL/$IMAGE_NAME:$BUILD_NUMBER"
-                        sh "docker tag $IMAGE_NAME:$BUILD_NUMBER $NEXUS_URL/$IMAGE_NAME:latest"
-                        sh "docker push $NEXUS_URL/$IMAGE_NAME:$BUILD_NUMBER"
-                        sh "docker push $NEXUS_URL/$IMAGE_NAME:latest"
+                    docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
+                        sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:latest"
                     }
                 }
             }

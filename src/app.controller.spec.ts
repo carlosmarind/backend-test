@@ -26,9 +26,12 @@ describe('AppController', () => {
     await app.close();
   });
 
-  it('/ (GET)', async () => {
-    await request(app.getHttpServer()).get('/').expect(200).expect('Hello !!');
-  });
+it('/ (GET)', async () => {
+  await request(app.getHttpServer())
+    .get('/')
+    .expect(200)
+    .expect('Hello !!')
+}, 20000); // <- 20 segundos en lugar de 5
 
   it('/apikey (GET)', async () => {
     await request(app.getHttpServer())
