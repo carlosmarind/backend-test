@@ -15,6 +15,8 @@ pipeline {
         NEXUS_URL = "nexus:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
+        // SonarQube host actualizado con puerto correcto
+        SONAR_HOST_URL = "http://host.docker.internal:8084"
     }
 
     stages {
@@ -60,16 +62,6 @@ pipeline {
         stage('Quality Assurance - SonarQube') {
             steps {
                 script {
-                    // Detectar host de SonarQube automáticamente
-                    def sonarHost = sh(script: '''
-                        if ping -c 1 sonarqube &> /dev/null; then
-                            echo "sonarqube"
-                        else
-                            echo "host.docker.internal"
-                        fi
-                    ''', returnStdout: true).trim()
-                    
-                    env.SONAR_HOST_URL = "http://${sonarHost}:9000"
                     echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
                     
                     // Debug cobertura
