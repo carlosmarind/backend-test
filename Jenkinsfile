@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'cimg/node:22.2.0'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
+            args '-v /var/run/docker.sock:/var/run/docker.sock --network devnet'
             reuseNode true
         }
     }
