@@ -53,31 +53,36 @@ pipeline {
         }
 
         stage('Quality Assurance - SonarQube') {
-            steps {
-                script {
-                    // Volumen persistente para cache de SonarScanner
-                    def sonarCache = "${env.WORKSPACE}/.sonar/cache"
+            stage('Quality Assurance - SonarQube') {
+    steps {
+        withSonarQubeEnv('SonarQubeServer') { // El nombre que tienes configurado en Jenkins
+            sh """
+                docker run --rm \
+                    -v ${env.WORKSPACE}/.sonar/cache:/root/.sonar \
+                    --network devnet \
+                    -w ${env.WORKSPACE} \
+                    sonarsource/sonar-scanner-cli:latest \
+                    sonar-scanner \
+                        -Dsonar.projectKey=backend-test \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.test.inclusions=**/*.spec.ts \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.exclusions=node_modules/**,dist/** \
+                        -Dsonar.coverage.exclusions=**/*.spec.ts
+            """
+        }
+    }
+}
 
-                    // Crear directorio cache si no existe
-                    sh "mkdir -p ${sonarCache}"
+stage('Quality Gate') {
+    steps {
+        timeout(time: 10, unit: 'MINUTES') {
+            waitForQualityGate abortPipeline: true
+        }
+    }
+}
 
-                    // Ejecutar SonarScanner desde contenedor con scanner preinstalado
-                    docker.image('sonarsource/sonar-scanner-cli:latest').inside("-v ${sonarCache}:/root/.sonar --network devnet") {
-                        sh """
-                            sonar-scanner \
-                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                                -Dsonar.sources=src \
-                                -Dsonar.tests=src \
-                                -Dsonar.test.inclusions=**/*.spec.ts \
-                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                -Dsonar.exclusions=node_modules/**,dist/** \
-                                -Dsonar.coverage.exclusions=**/*.spec.ts \
-                                -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.login=${SONAR_AUTH_TOKEN}
-                        """
-                    }
-                }
-            }
         }
 
         stage('Quality Gate') {
