@@ -25,21 +25,21 @@ pipeline {
         stage('Quality Assurance') {
             steps {
                 withSonarQubeEnv('SonarQube') { 
-                script {
-                    docker.image('sonarsource/sonar-scanner-cli:latest').inside('--network dockercompose_devnet') {
-                    sh '''
-                        sonar-scanner \
-                        -Dsonar.projectKey=backend-test \
-                        -Dsonar.sources=src \
-                        -Dsonar.tests=src \
-                        -Dsonar.test.inclusions=src/**/*.spec.ts \
-                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                        -Dsonar.testExecutionReportPaths=reports/junit.xml \
-                        -Dsonar.login=$SONAR_AUTH_TOKEN \
-                        -Dsonar.host.url=$SONAR_HOST_URL
-                    '''
+                    script {
+                        docker.image('sonarsource/sonar-scanner-cli:latest').inside('--network dockercompose_devnet') {
+                            sh '''
+                                sonar-scanner \
+                                -Dsonar.projectKey=backend-test \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=src \
+                                -Dsonar.test.inclusions=src/**/*.spec.ts \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.testExecutionReportPaths=reports/junit.xml \
+                                -Dsonar.login=$SONAR_AUTH_TOKEN \
+                                -Dsonar.host.url=$SONAR_HOST_URL
+                            '''
+                        }
                     }
-                }
                 }
             }
         }
