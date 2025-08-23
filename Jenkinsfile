@@ -31,8 +31,8 @@ pipeline {
                 sh '''
                     npm run test:cov
                     if [ ! -f coverage/lcov.info ]; then
-                      echo "ERROR: No se generó coverage/lcov.info"
-                      exit 1
+                        echo "ERROR: No se generó coverage/lcov.info"
+                        exit 1
                     fi
                     echo "Normalizando rutas en lcov.info..."
                     sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
@@ -51,8 +51,8 @@ pipeline {
             steps {
                 sh '''
                     echo "Verificando conectividad con SonarQube..."
-                    ping -c 3 sonarqube
-                    curl -v http://sonarqube:9000/api/ce/task?id=AZjW7334nHzWyVn2v4LF || true
+                    # Usamos curl en lugar de ping para evitar error 127
+                    curl -sSf ${SONAR_HOST_URL}/api/health || echo "No se pudo conectar a SonarQube"
                 '''
             }
         }
@@ -94,11 +94,14 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 script {
+                    // Limpiamos imágenes antiguas
                     sh """
                         docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
                         | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
                     """
+                    // Build
                     def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
+                    // Push a Nexus
                     docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
