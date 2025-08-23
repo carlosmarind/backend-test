@@ -46,9 +46,9 @@ pipeline {
             }
         }
 
-        stage('Quality Assurance - SonarQube') {
+stage('Quality Assurance - SonarQube') {
     steps {
-        withSonarQubeEnv('sonarqube-cred') { // usa el ID de la credencial de SonarQube configurada en Jenkins
+        withSonarQubeEnv('SonarQube server') {
             sh 'npx sonarqube-scanner \
                 -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                 -Dsonar.sources=src \
@@ -61,6 +61,7 @@ pipeline {
         }
     }
 }
+
 
         stage('Quality Gate') {
             steps {
