@@ -22,5 +22,12 @@ pipeline {
                 sh 'npm run build'
             }
         }
+        stage('Etapa de empaquetado y delivery') {
+            steps {
+                sh 'docker build -t backend-test:Dev .'
+                sh 'docker tag backend-test:Dev backend-test:LA'
+                sh 'docker push backend-test:LA'
+            }
+        }
     }
 }
