@@ -105,6 +105,18 @@ pipeline {
             }
         }
 
+stage('Verificar Nexus') {
+    steps {
+        script {
+            sh '''
+                echo "Haciendo ping a Nexus..."
+                ping -c 1 $(echo $NEXUS_URL | cut -d':' -f1) || exit 1
+            '''
+        }
+    }
+}
+
+
         stage('Build & Push Docker Image') {
     steps {
         script {
