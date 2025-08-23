@@ -113,17 +113,17 @@ pipeline {
             }
         }
 
-        stage('Actualizar Kubernetes') {
-            steps {
-                sh '''
-                    echo "Aplicando configuración de Kubernetes..."
-                    kubectl --kubeconfig=${KUBE_CONFIG} apply -f ${DEPLOYMENT_FILE}
+        // stage('Actualizar Kubernetes') {
+        //     steps {
+        //         sh '''
+        //             echo "Aplicando configuración de Kubernetes..."
+        //             kubectl --kubeconfig=${KUBE_CONFIG} apply -f ${DEPLOYMENT_FILE}
                     
-                    echo "Validando pods en ejecución..."
-                    kubectl --kubeconfig=${KUBE_CONFIG} rollout status deployment/backend-app
-                '''
-            }
-        }
+        //             echo "Validando pods en ejecución..."
+        //             kubectl --kubeconfig=${KUBE_CONFIG} rollout status deployment/backend-app
+        //         '''
+        //     }
+        // }
     }
 
     post {
