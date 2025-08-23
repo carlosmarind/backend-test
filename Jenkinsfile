@@ -12,11 +12,10 @@ pipeline {
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
         SONAR_PROJECT_KEY = "backend-test"
-        SONAR_HOST_URL = "http://host.docker.internal:8084"
-        SONAR_TOKEN = credentials('jenkins-token') // token de SonarQube
         NEXUS_URL = "nexus:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
+        SONAR_HOST_URL = "http://host.docker.internal:8084"
     }
 
     stages {
@@ -31,8 +30,8 @@ pipeline {
                 sh '''
                     npm run test:cov
                     if [ ! -f coverage/lcov.info ]; then
-                        echo "ERROR: No se generó coverage/lcov.info"
-                        exit 1
+                      echo "ERROR: No se generó coverage/lcov.info"
+                      exit 1
                     fi
                     echo "Normalizando rutas en lcov.info..."
                     sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
@@ -48,31 +47,34 @@ pipeline {
         }
 
         stage('Quality Assurance - SonarQube') {
-    steps {
-        script {
-            echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
-            sh '''
-                echo "Resumen lcov.info (primeras 10 líneas):"
-                head -n 10 coverage/lcov.info
-                echo "Total de líneas en lcov.info: $(wc -l < coverage/lcov.info)"
-            '''
-            sh """
-                npx sonarqube-scanner \
-                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                -Dsonar.sources=src \
-                -Dsonar.tests=src \
-                -Dsonar.test.inclusions=**/*.spec.ts \
-                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                -Dsonar.exclusions=node_modules/**,dist/** \
-                -Dsonar.coverage.exclusions=**/*.spec.ts \
-                -Dsonar.host.url=${SONAR_HOST_URL} \
-                -Dsonar.token=${SONAR_TOKEN} \
-                -Dsonar.qualitygate.wait=true
-            """
+            steps {
+                withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
+                    script {
+                        echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
+                        sh '''
+                            if [ ! -f coverage/lcov.info ]; then
+                                echo "ERROR: coverage/lcov.info NO existe!"
+                                exit 1
+                            fi
+                            echo "Resumen lcov.info (primeras 10 líneas):"
+                            head -n 10 coverage/lcov.info
+                            echo "Total de líneas en lcov.info: $(wc -l < coverage/lcov.info)"
+                        '''
+                        sh 'npx sonarqube-scanner \
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                            -Dsonar.sources=src \
+                            -Dsonar.tests=src \
+                            -Dsonar.test.inclusions=**/*.spec.ts \
+                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                            -Dsonar.exclusions=node_modules/**,dist/** \
+                            -Dsonar.coverage.exclusions=**/*.spec.ts \
+                            -Dsonar.host.url=${SONAR_HOST_URL} \
+                            -Dsonar.login=$SONAR_TOKEN \
+                            -Dsonar.qualitygate.wait=true'
+                    }
+                }
+            }
         }
-    }
-}
-
 
         stage('Quality Gate') {
             steps {
