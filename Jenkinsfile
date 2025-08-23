@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'cimg/node:22.2.0' 
+            image 'cimg/node:22.2.0'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
@@ -12,10 +12,10 @@ pipeline {
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
         SONAR_PROJECT_KEY = "backend-test"
-        NEXUS_URL = "nexus:8082"
+        NEXUS_URL = "nexus_repo:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
-        SONAR_HOST_URL = "http://host.docker.internal:8084"
+        SONAR_HOST_URL = "http://sonarqube:9000"
     }
 
     stages {
@@ -46,24 +46,25 @@ pipeline {
             }
         }
 
-stage('Quality Assurance - SonarQube') {
-    steps {
-        script {
-            withSonarQubeEnv('SonarQube') { // <-- usar el nombre exacto de la instalación
-                sh 'npx sonarqube-scanner \
-                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                    -Dsonar.sources=src \
-                    -Dsonar.tests=src \
-                    -Dsonar.test.inclusions=**/*.spec.ts \
-                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                    -Dsonar.exclusions=node_modules/**,dist/** \
-                    -Dsonar.coverage.exclusions=**/*.spec.ts \
-                    -Dsonar.qualitygate.wait=true'
+        stage('Quality Assurance - SonarQube') {
+            steps {
+                script {
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            npx sonarqube-scanner \
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=src \
+                                -Dsonar.test.inclusions=**/*.spec.ts \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.exclusions=node_modules/**,dist/** \
+                                -Dsonar.coverage.exclusions=**/*.spec.ts \
+                                -Dsonar.host.url=${SONAR_HOST_URL}
+                        """
+                    }
+                }
             }
         }
-    }
-}
-
 
         stage('Quality Gate') {
             steps {
