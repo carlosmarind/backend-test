@@ -73,8 +73,8 @@ pipeline {
                         -Dsonar.sources=src \
                         -Dsonar.tests=src \
                         -Dsonar.test.inclusions=**/*.spec.ts \
-                        -Dsonar.javascript.lcov.reportPaths=/usr/src/coverage/lcov.info \
-                        -Dsonar.exclusions=node_modules/**,dist/** \
+                        -Dsonar.javascript.lcov.reportPaths=/usr/src/coverage/lcov.info
+                        -Dsonar.exclusions=node_modules/**,dist/**
                         -Dsonar.host.url=${SONAR_HOST_URL} \
                         -Dsonar.qualitygate.wait=true
                     '''
