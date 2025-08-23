@@ -24,9 +24,13 @@ pipeline {
         }
         stage('Etapa de empaquetado y delivery') {
             steps {
-                sh 'docker build -t backend-test:Dev .'
-                sh 'docker tag backend-test:Dev backend-test:LA'
-                sh 'docker push backend-test:LA'
+                script{
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
+                        sh 'docker build -t backend-test:Test .'
+                        sh 'docker tag backend-test:Test landaura/backend-test:Dev'
+                        sh 'docker push landaura/backend-test:Dev'
+                    }
+                }
             }
         }
     }
