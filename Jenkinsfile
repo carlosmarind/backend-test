@@ -25,7 +25,7 @@ pipeline {
         stage('Etapa de empaquetado y delivery') {
             steps {
                 script{
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
+                    docker.withRegistry('https://index.docker.io/', 'dockerhub-credentials') {
                         sh 'docker build -t landaura/backend-test:Dev .'
                         sh 'docker tag landaura/backend-test:Dev landaura/backend-test:Dev'
                         sh 'docker push landaura/backend-test:Dev'
