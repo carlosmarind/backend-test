@@ -15,15 +15,13 @@ pipeline {
         NEXUS_URL = "nexus_repo:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
-        SONAR_HOST_URL = "http://sonarqube:9000"  // dentro de devnet
+        SONAR_HOST_URL = "http://sonarqube:9000"
         SONAR_AUTH_TOKEN = credentials('sonarqube-cred')
     }
 
     stages {
         stage('Instalación de dependencias') {
-            steps {
-                sh 'npm ci'
-            }
+            steps { sh 'npm ci' }
         }
 
         stage('Ejecución de pruebas con cobertura') {
@@ -42,9 +40,7 @@ pipeline {
         }
 
         stage('Build aplicación') {
-            steps {
-                sh 'npm run build'
-            }
+            steps { sh 'npm run build' }
         }
 
         stage('Debug SonarQube connectivity') {
@@ -70,7 +66,7 @@ pipeline {
                                 -Dsonar.exclusions=node_modules/**,dist/** \
                                 -Dsonar.coverage.exclusions=**/*.spec.ts \
                                 -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.login=${SONAR_AUTH_TOKEN}
+                                -Dsonar.token=${SONAR_AUTH_TOKEN}
                         """
                     }
                 }
@@ -87,7 +83,7 @@ pipeline {
                         if (gate.status != 'OK') {
                             def failedConditions = gate.conditions.findAll { it.status == 'ERROR' }
                             failedConditions.each { cond ->
-                                echo "Fallo Quality Gate: ${cond.metricKey} ${cond.actualValue} ${cond.operator} ${cond.errorThreshold}"
+                                echo "Fallo Quality Gate: ${cond.metricKey} = ${cond.actualValue} ${cond.operator} ${cond.errorThreshold}"
                             }
                             error "Pipeline detenido por Quality Gate"
                         } else {
@@ -101,14 +97,19 @@ pipeline {
         stage('Build & Push Docker Image') {
             steps {
                 script {
-                    // Limpiamos imágenes antiguas
+                    // Limpiar imágenes antiguas
                     sh """
                         docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
                         | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
                     """
                     // Build
                     def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
-                    // Push a Nexus
+                    
+                    // Push a Nexus usando http
+                    sh """
+                        echo "Verificando que ${NEXUS_URL} sea resolvible..."
+                        ping -c 1 $(echo ${NEXUS_URL} | cut -d':' -f1) || exit 1
+                    """
                     docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
@@ -121,8 +122,6 @@ pipeline {
     }
 
     post {
-        always {
-            echo 'Pipeline finalizado'
-        }
+        always { echo 'Pipeline finalizado' }
     }
 }

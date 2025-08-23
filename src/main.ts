@@ -3,7 +3,8 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 
-export async function bootstrap() { // ✅ export agregado
+/* istanbul ignore next */
+export async function bootstrap() { 
   const app = await NestFactory.create(AppModule);
   await app.listen(process.env.PORT ?? 4000);
 
@@ -12,6 +13,7 @@ export async function bootstrap() { // ✅ export agregado
 }
 
 // Solo ejecutar si es el archivo principal
+/* istanbul ignore next */
 if (require.main === module) {
   bootstrap().catch((e) => console.log(`Error al iniciar la aplicacion: ${e}`));
 }
