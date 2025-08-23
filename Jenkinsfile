@@ -1,8 +1,7 @@
 pipeline {
     agent {
         docker {
-            // Imagen con Node 22 + OpenJDK 17
-            image 'cimg/node:22.2.0' 
+            image 'cimg/node:22.2.0'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
@@ -17,14 +16,12 @@ pipeline {
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
         SONAR_HOST_URL = "http://host.docker.internal:8084"
-        SONAR_TOKEN = credentials('jenkins-token') // <-- Token SonarQube
+        SONAR_TOKEN = credentials('jenkins-token') // Token SonarQube
     }
 
     stages {
         stage('Instalación de dependencias') {
-            steps {
-                sh 'npm ci'
-            }
+            steps { sh 'npm ci' }
         }
 
         stage('Ejecución de pruebas con cobertura') {
@@ -35,32 +32,18 @@ pipeline {
                       echo "ERROR: No se generó coverage/lcov.info"
                       exit 1
                     fi
-                    echo "Normalizando rutas en lcov.info..."
                     sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
                     sed -i 's|\\\\|/|g' coverage/lcov.info
                 '''
             }
         }
 
-        stage('Build aplicación') {
-            steps {
-                sh 'npm run build'
-            }
-        }
+        stage('Build aplicación') { steps { sh 'npm run build' } }
 
         stage('Quality Assurance - SonarQube') {
             steps {
                 script {
                     echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
-                    sh '''
-                        if [ ! -f coverage/lcov.info ]; then
-                            echo "ERROR: coverage/lcov.info NO existe!"
-                            exit 1
-                        fi
-                        echo "Resumen lcov.info (primeras 10 líneas):"
-                        head -n 10 coverage/lcov.info
-                        echo "Total de líneas en lcov.info: $(wc -l < coverage/lcov.info)"
-                    '''
                     sh 'npx sonarqube-scanner \
                         -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                         -Dsonar.sources=src \
@@ -109,8 +92,6 @@ pipeline {
     }
 
     post {
-        always {
-            echo 'Pipeline finalizado'
-        }
+        always { echo 'Pipeline finalizado' }
     }
 }
