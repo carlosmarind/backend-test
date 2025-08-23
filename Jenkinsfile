@@ -43,26 +43,26 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQubeServer') { // Cambia al nombre de tu SonarQube server en Jenkins
-                    sh """
-                        docker run --rm \
-                        -v ${env.WORKSPACE}/.sonar/cache:/root/.sonar \
-                        --network devnet \
-                        -w ${env.WORKSPACE} \
-                        sonarsource/sonar-scanner-cli:latest \
-                        sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=src \
-                            -Dsonar.tests=src \
-                            -Dsonar.test.inclusions=**/*.spec.ts \
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.exclusions=node_modules/**,dist/** \
-                            -Dsonar.coverage.exclusions=**/*.spec.ts
-                    """
-                }
-            }
-        }
+    withSonarQubeEnv('SonarQube') { // <- nombre exacto de tu servidor en Jenkins
+        sh """
+            sonar-scanner \
+            -Dsonar.projectKey=backend-test \
+            -Dsonar.sources=src \
+            -Dsonar.tests=src \
+            -Dsonar.test.inclusions=**/*.spec.ts \
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+            -Dsonar.exclusions=node_modules/**,dist/** \
+            -Dsonar.coverage.exclusions=**/*.spec.ts
+        """
+    }
+}
+
+stage('Quality Gate') {
+    timeout(time: 10, unit: 'MINUTES') {
+        waitForQualityGate abortPipeline: true
+    }
+}
+
 
         stage('Quality Gate') {
             steps {
