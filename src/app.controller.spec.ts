@@ -28,8 +28,8 @@ describe('AppController', () => {
 
   describe('Probar el modulo raiz del proyecto', () => {
     test('Esto deberia retornar hola mundo en ingles"', () => {
-      //expect(appController.getHello()).toBe('Hello !!');
-      expect(appController.getHello()).toBe('Hello maumir!!');
+      expect(appController.getHello()).toBe('Hello !!');
+      //expect(appController.getHello()).toBe('Hello maumir!!');
     });
   });
 });
