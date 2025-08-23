@@ -15,7 +15,7 @@ pipeline {
         NEXUS_URL = "nexus_repo:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
-        SONAR_HOST_URL = "http://sonarqube:9000"
+        SONAR_HOST_URL = "http://host.docker.internal:8084"
     }
 
     stages {
