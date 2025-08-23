@@ -1,8 +1,8 @@
 pipeline {
     agent {
         docker {
-            image 'edgardobenavidesl/node-with-docker-cli:22'
-            args '-v /var/run/docker.sock:/var/run/docker.sock --network jenkins_default'
+        image 'edgardobenavidesl/node-with-docker-cli:22'
+        args '-v /var/run/docker.sock:/var/run/docker.sock'
             reuseNode true
         }
     }
