@@ -44,8 +44,9 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') { // nombre del servidor SonarQube en Jenkins
-                    sh """
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        npm install -g sonar-scanner
                         sonar-scanner \
                         -Dsonar.projectKey=backend-test \
                         -Dsonar.sources=src \
@@ -54,7 +55,7 @@ pipeline {
                         -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                         -Dsonar.exclusions=node_modules/**,dist/** \
                         -Dsonar.coverage.exclusions=**/*.spec.ts
-                    """
+                    '''
                 }
             }
         }
