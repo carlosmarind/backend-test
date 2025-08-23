@@ -12,6 +12,7 @@ pipeline {
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
         SONAR_HOST_URL = "http://host.docker.internal:9000"
+        SONAR_PROJECT_KEY = "backend-test"
     }
 
     stages {
@@ -19,8 +20,6 @@ pipeline {
             steps {
                 checkout([$class: 'GitSCM',
                     branches: [[name: 'dev']],
-                    doGenerateSubmoduleConfigurations: false,
-                    extensions: [],
                     userRemoteConfigs: [[
                         url: 'https://github.com/EdgardoBenavides/backend-test.git',
                         credentialsId: 'Githubpas'
@@ -35,9 +34,15 @@ pipeline {
             }
         }
 
-        stage('Ejecución de pruebas automatizadas') {
+        stage('Ejecución de pruebas con cobertura') {
             steps {
-                sh 'npm run test:cov'
+                sh '''
+                    npm run test:cov
+                    if [ ! -f coverage/lcov.info ]; then
+                      echo "ERROR: No se generó coverage/lcov.info"
+                      exit 1
+                    fi
+                '''
             }
         }
 
@@ -48,42 +53,26 @@ pipeline {
         }
 
         stage('Quality Assurance') {
-    agent {
-        docker {
-            image 'sonarsource/sonar-scanner-cli'
-            args '-v $WORKSPACE:/usr/src'
-            reuseNode true
-        }
-    }
-    steps {
-        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-            withSonarQubeEnv('SonarQube') {
-                script {
-                    // Normalizar separadores de ruta en lcov.info
+            steps {
+                withSonarQubeEnv('SonarQube') {
                     sh '''
+                        echo "Normalizando rutas en lcov.info..."
                         sed -i 's|\\\\|/|g' coverage/lcov.info
-                        mkdir -p /usr/src/coverage
-                        cp coverage/lcov.info /usr/src/coverage/lcov.info
-                    '''
 
-                    // Ejecutar análisis con cobertura
-                    sh '''
+                        echo "Ejecutando análisis SonarQube..."
                         sonar-scanner \
-                        -Dsonar.projectKey=backend-test \
-                        -Dsonar.sources=src \
-                        -Dsonar.tests=src \
-                        -Dsonar.test.inclusions=**/*.spec.ts \
-                        -Dsonar.javascript.lcov.reportPaths=/usr/src/coverage/lcov.info
-                        -Dsonar.exclusions=node_modules/**,dist/**
-                        -Dsonar.host.url=${SONAR_HOST_URL} \
-                        -Dsonar.qualitygate.wait=true
+                          -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                          -Dsonar.sources=src \
+                          -Dsonar.tests=src \
+                          -Dsonar.test.inclusions=**/*.spec.ts \
+                          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                          -Dsonar.exclusions=node_modules/**,dist/** \
+                          -Dsonar.host.url=${SONAR_HOST_URL} \
+                          -Dsonar.qualitygate.wait=true
                     '''
                 }
             }
         }
-    }
-}
-
 
         stage('Quality Gate') {
             steps {
@@ -91,7 +80,7 @@ pipeline {
                     script {
                         def gate = waitForQualityGate()
                         if (gate.status != 'OK') {
-                            error "Quality Gate failed with status: ${gate.status}"
+                            error "Quality Gate failed: ${gate.status}"
                         }
                     }
                 }
