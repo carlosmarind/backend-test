@@ -106,29 +106,37 @@ pipeline {
         }
 
         stage('Build & Push Docker Image') {
-            steps {
-                script {
-                    sh """
-                        docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
-                        | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
-                    """
+    steps {
+        script {
+            // Calcular el límite dinámico en Groovy
+            def maxImages = MAX_IMAGES_TO_KEEP.toInteger() + 1
 
-                    def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
+            // Limpiar imágenes antiguas
+            sh """
+                docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
+                | sort -r | tail -n +${maxImages} | xargs -r docker rmi -f || true
+            """
 
-                    sh """
-                        echo "Verificando que ${NEXUS_URL} sea resolvible..."
-                        ping -c 1 $(echo ${NEXUS_URL} | cut -d':' -f1) || exit 1
-                    """
+            // Build de la imagen Docker
+            def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
 
-                    docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
-                        sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
-                        sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:latest"
-                    }
-                }
+            // Verificar conectividad con Nexus
+            sh """
+                echo "Verificando que ${NEXUS_URL} sea resolvible..."
+                ping -c 1 $(echo ${NEXUS_URL} | cut -d':' -f1) || exit 1
+            """
+
+            // Push al repositorio Nexus
+            docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
+                sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
+                sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:latest"
             }
         }
+    }
+}
+
     }
 
     post {
