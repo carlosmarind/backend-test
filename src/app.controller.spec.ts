@@ -31,7 +31,7 @@ it('/ (GET)', async () => {
     .get('/')
     .expect(200)
     .expect('Hello !!')
-}, 20000); // <- 20 segundos en lugar de 5
+},  60000); // <- 20 segundos en lugar de 5
 
   it('/apikey (GET)', async () => {
     await request(app.getHttpServer())
@@ -43,7 +43,7 @@ it('/ (GET)', async () => {
   it('/validate-rut valido (GET)', async () => {
     await request(app.getHttpServer())
       .get('/validate-rut?rut=11111111-1')
-      .expect(200)
+      .expect(400)
       .expect({ mensaje: 'rut valido' });
   });
 

@@ -26,20 +26,21 @@ pipeline {
             }
         }
 
-        stage('Ejecución de pruebas con cobertura') {
-            steps {
-                sh '''
-                    npm run test:cov -- --testTimeout=20000
-                    if [ ! -f coverage/lcov.info ]; then
-                        echo "ERROR: No se generó coverage/lcov.info"
-                        exit 1
-                    fi
-                    echo "Normalizando rutas en lcov.info..."
-                    sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
-                    sed -i 's|\\\\|/|g' coverage/lcov.info
-                '''
-            }
+    stage('Ejecución de pruebas con cobertura') {
+        steps {
+            sh '''
+                npm run test:cov
+                if [ ! -f coverage/lcov.info ]; then
+                    echo "ERROR: No se generó coverage/lcov.info"
+                    exit 1
+                fi
+                echo "Normalizando rutas en lcov.info..."
+                sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
+                sed -i 's|\\\\|/|g' coverage/lcov.info
+            '''
         }
+    }
+
 
         stage('Build aplicación') {
             steps {
