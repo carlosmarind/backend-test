@@ -11,15 +11,26 @@ pipeline {
     }
     stages {
         stage('Instalación de dependencias') {
-            steps { sh 'npm install' }
+            steps { 
+                sh 'npm install' 
+            }
         }
 
         stage('Pruebas automatizadas') {
-            steps { sh 'npm run test:cov' }
+            steps {
+                sh '''
+                    export JEST_JUNIT_OUTPUT_DIR=reports
+                    export JEST_JUNIT_OUTPUT_NAME=junit.xml
+                    export JEST_JUNIT_SUITE_NAME=backend-test
+                    npm run test:cov
+                '''
+            }
         }
 
         stage('Construcción de aplicación') {
-            steps { sh 'npm run build' }
+            steps { 
+                sh 'npm run build' 
+            }
         }
 
         stage('Quality Assurance') {
