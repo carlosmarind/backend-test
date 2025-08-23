@@ -71,6 +71,17 @@ pipeline {
                     
                     env.SONAR_HOST_URL = "http://${sonarHost}:9000"
                     echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
+                    
+                    // Debug cobertura
+                    sh '''
+                        if [ ! -f coverage/lcov.info ]; then
+                            echo "ERROR: coverage/lcov.info NO existe!"
+                            exit 1
+                        fi
+                        echo "Resumen lcov.info (primeras 10 líneas):"
+                        head -n 10 coverage/lcov.info
+                        echo "Total de líneas en lcov.info: $(wc -l < coverage/lcov.info)"
+                    '''
                 }
                 withSonarQubeEnv('SonarQube') {
                     sh '''
