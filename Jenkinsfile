@@ -48,30 +48,31 @@ pipeline {
         }
 
         stage('Quality Assurance - SonarQube') {
-            steps {
-                script {
-                    echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
-                    sh '''
-                        echo "Resumen lcov.info (primeras 10 líneas):"
-                        head -n 10 coverage/lcov.info
-                        echo "Total de líneas en lcov.info: $(wc -l < coverage/lcov.info)"
-                    '''
-                    sh """
-                        npx sonarqube-scanner \
-                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                        -Dsonar.sources=src \
-                        -Dsonar.tests=src \
-                        -Dsonar.test.inclusions=**/*.spec.ts \
-                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                        -Dsonar.exclusions=node_modules/**,dist/** \
-                        -Dsonar.coverage.exclusions=**/*.spec.ts \
-                        -Dsonar.host.url=${SONAR_HOST_URL} \
-                        -Dsonar.login=${SONAR_TOKEN} \
-                        -Dsonar.qualitygate.wait=true
-                    """
-                }
-            }
+    steps {
+        script {
+            echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
+            sh '''
+                echo "Resumen lcov.info (primeras 10 líneas):"
+                head -n 10 coverage/lcov.info
+                echo "Total de líneas en lcov.info: $(wc -l < coverage/lcov.info)"
+            '''
+            sh """
+                npx sonarqube-scanner \
+                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                -Dsonar.sources=src \
+                -Dsonar.tests=src \
+                -Dsonar.test.inclusions=**/*.spec.ts \
+                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                -Dsonar.exclusions=node_modules/**,dist/** \
+                -Dsonar.coverage.exclusions=**/*.spec.ts \
+                -Dsonar.host.url=${SONAR_HOST_URL} \
+                -Dsonar.token=${SONAR_TOKEN} \
+                -Dsonar.qualitygate.wait=true
+            """
         }
+    }
+}
+
 
         stage('Quality Gate') {
             steps {
