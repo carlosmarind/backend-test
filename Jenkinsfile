@@ -20,17 +20,17 @@ pipeline {
     }
 
     stages {
-        stage('Checkout SCM') {
-            steps {
-                checkout([$class: 'GitSCM',
-                    branches: [[name: 'dev']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/EdgardoBenavides/backend-test.git',
-                        credentialsId: 'Githubpas'
-                    ]]
-                ])
-            }
-        }
+        // stage('Checkout SCM') {
+        //     steps {
+        //         checkout([$class: 'GitSCM',
+        //             branches: [[name: 'dev']],
+        //             userRemoteConfigs: [[
+        //                 url: 'https://github.com/EdgardoBenavides/backend-test.git',
+        //                 credentialsId: 'Githubpas'
+        //             ]]
+        //         ])
+        //     }
+        // }
 
         stage('Instalación de dependencias') {
             steps {
