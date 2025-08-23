@@ -51,8 +51,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Verificando conectividad con SonarQube..."
-                    # Usamos curl en lugar de ping para evitar error 127
-                    curl -sSf ${SONAR_HOST_URL}/api/health || echo "No se pudo conectar a SonarQube"
+                    curl -sSf -u ${SONAR_AUTH_TOKEN}: ${SONAR_HOST_URL}/api/system/health || echo "No se pudo conectar a SonarQube"
                 '''
             }
         }
