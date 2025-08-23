@@ -11,7 +11,7 @@ pipeline {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
-        SONAR_HOST_URL = "http://sonarqube:9000" // Sonar en la misma red
+        SONAR_HOST_URL = "http://sonarqube:9000" // Sonar en la misma red Docker
         SONAR_PROJECT_KEY = "backend-test"
         NEXUS_URL = "nexus:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
@@ -45,6 +45,9 @@ pipeline {
                       echo "ERROR: No se generó coverage/lcov.info"
                       exit 1
                     fi
+                    echo "Normalizando rutas en lcov.info..."
+                    sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
+                    sed -i 's|\\\\|/|g' coverage/lcov.info
                 '''
             }
         }
@@ -59,10 +62,6 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                        echo "Normalizando rutas en lcov.info..."
-                        sed -i 's|\\\\|/|g' coverage/lcov.info
-
-                        echo "Ejecutando análisis SonarQube..."
                         sonar-scanner \
                           -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                           -Dsonar.sources=src \
@@ -118,7 +117,7 @@ pipeline {
         //         sh '''
         //             echo "Aplicando configuración de Kubernetes..."
         //             kubectl --kubeconfig=${KUBE_CONFIG} apply -f ${DEPLOYMENT_FILE}
-                    
+
         //             echo "Validando pods en ejecución..."
         //             kubectl --kubeconfig=${KUBE_CONFIG} rollout status deployment/backend-app
         //         '''
