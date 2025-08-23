@@ -49,7 +49,7 @@ pipeline {
 stage('Quality Assurance - SonarQube') {
     steps {
         script {
-            withSonarQubeEnv('SonarQube Server') {
+            withSonarQubeEnv('SonarQube') { // <-- usar el nombre exacto de la instalación
                 sh 'npx sonarqube-scanner \
                     -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                     -Dsonar.sources=src \
