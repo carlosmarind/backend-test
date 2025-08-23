@@ -1,5 +1,9 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'node:22' 
+        }
+    }
 
     environment {
         NODE_OPTIONS = "--max-old-space-size=4096"
@@ -24,7 +28,7 @@ pipeline {
             }
             post {
                 always {
-                    junit '**/test-results/**/*.xml' 
+                    junit '**/test-results/**/*.xml'
                 }
             }
         }
