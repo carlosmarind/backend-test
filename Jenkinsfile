@@ -62,7 +62,7 @@ pipeline {
                             sonar-scanner \
                             -Dsonar.projectKey=backend-test \
                             -Dsonar.sources=. \
-                            -Dsonar.exclusions=node_modules/**,dist/**,coverage/** \
+                            -Dsonar.exclusions=node_modules/**,dist/**
                             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                             -Dsonar.host.url=${SONAR_HOST_URL} \
                             -Dsonar.qualitygate.wait=true
