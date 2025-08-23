@@ -23,7 +23,7 @@ pipeline {
         // stage('Checkout SCM') {
         //     steps {
         //         checkout([$class: 'GitSCM',
-        //             branches: [[name: 'dev']],
+        //             branches: [[name: 'main']],
         //             userRemoteConfigs: [[
         //                 url: 'https://github.com/EdgardoBenavides/backend-test.git',
         //                 credentialsId: 'Githubpas'
