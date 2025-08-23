@@ -34,23 +34,19 @@ pipeline {
     }
 
 stage('Testing + Coverage') {
-  environment {
-    JEST_JUNIT_OUTPUT_DIR = '.'
-    JEST_JUNIT_OUTPUT_NAME = 'junit-report.xml'
-  }
   steps {
     script {
-      // Ejecuta tests y captura el código de salida
       def status = sh(script: '''
+        set -e
         rm -f junit*.xml || true
-        npm test -- --coverage --reporters=default --reporters=jest-junit
+        npm run test:ci
+        echo "Archivos JUnit generados:"
+        ls -l junit*.xml || true
       ''', returnStatus: true)
-
-      sh 'ls -l junit*.xml || true'
 
       if (status != 0) {
         currentBuild.result = 'UNSTABLE'
-        echo "⚠️ Tests fallaron (exit=${status}). Marcando UNSTABLE, pero continuamos."
+        echo "⚠️ Tests fallaron (exit=${status}). Marcamos UNSTABLE, pero continuamos."
       }
     }
   }
@@ -193,10 +189,10 @@ post {
   always {
     sh 'command -v docker >/dev/null 2>&1 && docker logout ${REGISTRY} || true'
 
-    // Acepta cualquiera que se llame junit*.xml mientras estabilizas
+    // por ahora tolerante:
     junit allowEmptyResults: true, testResults: 'junit*.xml'
 
-    // Nest compila a dist/, no a build/
+    // Nest compila a dist/
     archiveArtifacts artifacts: 'coverage/**/*, dist/**/*', allowEmptyArchive: true
   }
 }
