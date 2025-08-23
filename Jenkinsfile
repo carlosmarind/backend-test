@@ -56,7 +56,7 @@ pipeline {
             steps {
                 script {
                     withSonarQubeEnv('SonarQube') {
-                        sh """
+                        sh """#!/bin/bash
                             npx sonarqube-scanner \
                                 -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                                 -Dsonar.sources=src \
@@ -98,18 +98,21 @@ pipeline {
             steps {
                 script {
                     // Limpiar imágenes antiguas
-                    sh """
+                    sh """#!/bin/bash
                         docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
                         | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
                     """
+
                     // Build
                     def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
-                    
+
                     // Push a Nexus usando http
-                    sh """
-                        echo "Verificando que ${NEXUS_URL} sea resolvible..."
-                        ping -c 1 $(echo ${NEXUS_URL} | cut -d':' -f1) || exit 1
+                    sh """#!/bin/bash
+                        NEXUS_HOST=\$(echo ${NEXUS_URL} | cut -d':' -f1)
+                        echo "Verificando que \$NEXUS_HOST sea resolvible..."
+                        ping -c 1 \$NEXUS_HOST || exit 1
                     """
+
                     docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
