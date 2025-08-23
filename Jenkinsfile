@@ -1,9 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:22' 
-        }
-    }
+    agent any
 
     environment {
         NODE_OPTIONS = "--max-old-space-size=4096"
@@ -18,24 +14,38 @@ pipeline {
 
         stage('Instalar dependencias') {
             steps {
-                sh 'npm install'
+                script {
+                    docker.image('node:22').inside {
+                        sh 'npm install'
+                    }
+                }
             }
         }
 
         stage('Testing con cobertura') {
             steps {
-                sh 'npm test -- --coverage'
+                script {
+                    docker.image('node:22').inside {
+                        sh 'mkdir -p test-results'
+                        sh 'npm test -- --coverage'
+                    }
+                }
             }
             post {
                 always {
-                    junit '**/test-results/**/*.xml'
+                    junit 'test-results/junit.xml'
                 }
             }
         }
 
+
         stage('Build') {
             steps {
-                sh 'npm run build'
+                script {
+                    docker.image('node:22').inside {
+                        sh 'npm run build'
+                    }
+                }
             }
         }
     }
