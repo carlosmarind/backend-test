@@ -156,31 +156,47 @@ stage('Deploy to K8s') {
         kubectl cluster-info || true
         kubectl get ns | head -5 || true
 
-        # 5) Aplicamos manifiestos (sin validar OpenAPI)
+        # 5) Aplicamos manifiestos
         kubectl apply -f kubernetes.yaml --validate=false
 
-        
+        # 6) Actualizamos imagen con tag inmutable de este build
         TARGET_IMAGE=${REGISTRY}/${IMAGE_NAME}:${BUILD_NUMBER}
         echo "Actualizando deployment/backend-test a: ${TARGET_IMAGE}"
         kubectl -n default set image deployment/backend-test backend=${TARGET_IMAGE}
 
-        # 8) Esperamos el rollout con timeout y diagnóstico automático si falla
+        # 7) Esperamos rollout y, si falla, diagnosticamos
         if ! kubectl -n default rollout status deployment/backend-test --timeout=180s; then
           echo "Rollout NO completó. Mostrando diagnóstico..."
           kubectl -n default get deploy backend-test -o wide || true
           kubectl -n default get rs -l app=backend-test -o wide || true
-          kubectl -n default get pods -l app=backend-test \
-            -o custom-columns=NAME:.metadata.name,PHASE:.status.phase,READY:.status.containerStatuses[0].ready,REASON:.status.containerStatuses[0].state.waiting.reason,IMAGE:.spec.containers[0].image --no-headers || true
+          kubectl -n default get pods -l app=backend-test -o wide || true
           kubectl -n default describe deploy/backend-test || true
           kubectl -n default describe rs -l app=backend-test || true
           POD=$(kubectl -n default get pods -l app=backend-test -o jsonpath='{.items[?(@.status.containerStatuses[0].ready==false)].metadata.name}' 2>/dev/null || true)
           [ -n "$POD" ] && kubectl -n default logs "$POD" --tail=200 || true
           exit 1
         fi
+
+        # 8) 📸 Evidencia post-deploy (impresión + archivo para artefactos)
+        echo "===== K8s Status (post-deploy) =====" | tee k8s-status.txt
+        echo "\nDeployment:" | tee -a k8s-status.txt
+        kubectl -n default get deploy backend-test -o wide | tee -a k8s-status.txt
+
+        echo "\nReplicaSets:" | tee -a k8s-status.txt
+        kubectl -n default get rs -l app=backend-test -o wide | tee -a k8s-status.txt
+
+        echo "\nPods:" | tee -a k8s-status.txt
+        kubectl -n default get pods -l app=backend-test -o wide | tee -a k8s-status.txt
+
+        echo "\nService:" | tee -a k8s-status.txt
+        kubectl -n default get svc backend-test -o wide | tee -a k8s-status.txt
+
+        echo "\n(Para probar local: kubectl -n default port-forward svc/backend-test 3000:80 )" | tee -a k8s-status.txt
       '''
     }
   }
 }
+
 
 
 
@@ -190,11 +206,10 @@ post {
   always {
     sh 'command -v docker >/dev/null 2>&1 && docker logout ${REGISTRY} || true'
 
-    // por ahora tolerante:
     junit allowEmptyResults: true, testResults: 'junit*.xml'
 
-    // Nest compila a dist/
-    archiveArtifacts artifacts: 'coverage/**/*, dist/**/*', allowEmptyArchive: true
+    // agrega k8s-status.txt
+    archiveArtifacts artifacts: 'coverage/**/*, dist/**/*, k8s-status.txt', allowEmptyArchive: true
   }
 }
 }
