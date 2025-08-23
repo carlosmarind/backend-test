@@ -1,0 +1,55 @@
+version: "3.9"
+services:
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins
+    user: root
+    ports: ["8080:8080", "50000:50000"]
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock  # Jenkins usa el daemon de Docker Desktop
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=true
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: sonar-postgres
+    environment:
+      - POSTGRES_USER=sonar
+      - POSTGRES_PASSWORD=sonar
+      - POSTGRES_DB=sonarqube
+    volumes: [ "pg_data:/var/lib/postgresql/data" ]
+    restart: unless-stopped
+
+  sonarqube:
+    image: sonarqube:lts
+    container_name: sonarqube
+    depends_on: [ postgres ]
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://postgres:5432/sonarqube
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=sonar
+    ports: ["9000:9000"]
+    volumes:
+      - sonar_data:/opt/sonarqube/data
+      - sonar_extensions:/opt/sonarqube/extensions
+      - sonar_logs:/opt/sonarqube/logs
+    restart: unless-stopped
+
+  nexus:
+    image: sonatype/nexus3:latest
+    container_name: nexus
+    ports:
+      - "8081:8081"   # UI
+      - "8082:8082"   # Registry Docker (hosted)
+    volumes: [ "nexus_data:/nexus-data" ]
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:
+  pg_data:
+  sonar_data:
+  sonar_extensions:
+  sonar_logs:
+  nexus_data:

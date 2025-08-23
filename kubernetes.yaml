@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: default
+data:
+  USERNAME: "usuario-demo"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secrets
+  namespace: default
+type: Opaque
+data:
+  # echo -n "mi-api-key" | base64  -> bWktYXBpLWtleQ==
+  API_KEY: bWktYXBpLWtleQ==
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-test
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-test
+  template:
+    metadata:
+      labels:
+        app: backend-test
+    spec:
+      containers:
+        - name: backend
+          image: host.docker.internal:8082/labo3/backend-test:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+      # Si necesitas auth para pull, descomenta y crea el secret nexus-creds
+      # imagePullSecrets:
+      #   - name: nexus-creds
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-test
+  namespace: default
+spec:
+  selector:
+    app: backend-test
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP

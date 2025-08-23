@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="4" failures="0" errors="0" time="5.668">
+  <testsuite name="OperacionesService" errors="0" failures="0" skipped="0" timestamp="2025-08-23T01:05:21" time="4.051" tests="1">
+    <testcase classname="OperacionesService should be defined" name="OperacionesService should be defined" time="0.017">
+    </testcase>
+  </testsuite>
+  <testsuite name="AppController (e2e)" errors="0" failures="0" skipped="0" timestamp="2025-08-23T01:05:21" time="4.603" tests="1">
+    <testcase classname="AppController (e2e) /operaciones (GET)" name="AppController (e2e) /operaciones (GET)" time="0.389">
+    </testcase>
+  </testsuite>
+  <testsuite name="AppController" errors="0" failures="0" skipped="0" timestamp="2025-08-23T01:05:21" time="4.607" tests="2">
+    <testcase classname="AppController Probar el modulo raiz del proyecto Esto deberia retornar hola mundo en ingles&quot;" name="AppController Probar el modulo raiz del proyecto Esto deberia retornar hola mundo en ingles&quot;" time="0.022">
+    </testcase>
+    <testcase classname="AppController (e2e) / (GET)" name="AppController (e2e) / (GET)" time="0.32">
+    </testcase>
+  </testsuite>
+</testsuites>
