@@ -11,7 +11,6 @@ pipeline {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
-        SONAR_HOST_URL = "http://sonarqube:9000" // Sonar en la misma red Docker
         SONAR_PROJECT_KEY = "backend-test"
         NEXUS_URL = "nexus:8082"
         KUBE_CONFIG = "/home/jenkins/.kube/config"
@@ -60,6 +59,19 @@ pipeline {
 
         stage('Quality Assurance - SonarQube') {
             steps {
+                script {
+                    // Detectar host de SonarQube automáticamente
+                    def sonarHost = sh(script: '''
+                        if ping -c 1 sonarqube &> /dev/null; then
+                            echo "sonarqube"
+                        else
+                            echo "host.docker.internal"
+                        fi
+                    ''', returnStdout: true).trim()
+                    
+                    env.SONAR_HOST_URL = "http://${sonarHost}:9000"
+                    echo "Usando SonarQube host: ${env.SONAR_HOST_URL}"
+                }
                 withSonarQubeEnv('SonarQube') {
                     sh '''
                         sonar-scanner \
@@ -117,7 +129,7 @@ pipeline {
         //         sh '''
         //             echo "Aplicando configuración de Kubernetes..."
         //             kubectl --kubeconfig=${KUBE_CONFIG} apply -f ${DEPLOYMENT_FILE}
-
+        //
         //             echo "Validando pods en ejecución..."
         //             kubectl --kubeconfig=${KUBE_CONFIG} rollout status deployment/backend-app
         //         '''
