@@ -16,6 +16,7 @@ pipeline {
         KUBE_CONFIG = "/home/jenkins/.kube/config"
         DEPLOYMENT_FILE = "kubernetes.yaml"
         SONAR_HOST_URL = "http://sonarqube:9000"
+        SONAR_AUTH_TOKEN = credentials('sonarqube-cred')
     }
 
     stages {
@@ -69,7 +70,8 @@ pipeline {
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                                 -Dsonar.exclusions=node_modules/**,dist/** \
                                 -Dsonar.coverage.exclusions=**/*.spec.ts \
-                                -Dsonar.host.url=${SONAR_HOST_URL}
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.login=${SONAR_AUTH_TOKEN}
                         """
                     }
                 }
