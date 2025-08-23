@@ -1,12 +1,21 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'edgardobenavidesl/node-with-docker-cli:22'
+            args '-v /var/run/docker.sock:/var/run/docker.sock --network jenkins_default'
+            reuseNode true
+        }
+    }
 
     environment {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         MAX_IMAGES_TO_KEEP = 5
-        SONAR_HOST_URL = "http://host.docker.internal:9000"
+        SONAR_HOST_URL = "http://sonarqube:9000" // Sonar en la misma red
         SONAR_PROJECT_KEY = "backend-test"
+        NEXUS_URL = "nexus:8082"
+        KUBE_CONFIG = "/home/jenkins/.kube/config"
+        DEPLOYMENT_FILE = "kubernetes.yaml"
     }
 
     stages {
@@ -22,34 +31,31 @@ pipeline {
             }
         }
 
-        stage('Build & Test in Container') {
-            agent {
-                docker {
-                    image 'edgardobenavidesl/node-with-docker-cli:22'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                    reuseNode true
-                }
+        stage('Instalación de dependencias') {
+            steps {
+                sh 'npm ci'
             }
+        }
+
+        stage('Ejecución de pruebas con cobertura') {
             steps {
                 sh '''
-                    echo "Instalando dependencias..."
-                    npm ci
-
-                    echo "Ejecutando pruebas con cobertura..."
-                    npm run test:cov || true
-
+                    npm run test:cov
                     if [ ! -f coverage/lcov.info ]; then
-                        echo "ERROR: No se generó coverage/lcov.info"
-                        exit 1
+                      echo "ERROR: No se generó coverage/lcov.info"
+                      exit 1
                     fi
-
-                    echo "Construyendo aplicación..."
-                    npm run build
                 '''
             }
         }
 
-        stage('Quality Assurance (SonarQube)') {
+        stage('Build aplicación') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+
+        stage('Quality Assurance - SonarQube') {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
@@ -64,7 +70,9 @@ pipeline {
                           -Dsonar.test.inclusions=**/*.spec.ts \
                           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                           -Dsonar.exclusions=node_modules/**,dist/** \
-                          -Dsonar.host.url=${SONAR_HOST_URL}
+                          -Dsonar.coverage.exclusions=**/*.spec.ts \
+                          -Dsonar.host.url=${SONAR_HOST_URL} \
+                          -Dsonar.qualitygate.wait=true
                     '''
                 }
             }
@@ -83,7 +91,7 @@ pipeline {
             }
         }
 
-        stage('Empaquetado y push Docker') {
+        stage('Build & Push Docker Image') {
             steps {
                 script {
                     // Limpiar imágenes antiguas
@@ -92,33 +100,28 @@ pipeline {
                         | sort -r | tail -n +\$((MAX_IMAGES_TO_KEEP + 1)) | xargs -r docker rmi -f || true
                     """
 
-                    // Docker Hub
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
+                    def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
 
-                        sh "docker rmi ${IMAGE_NAME}:latest || true"
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${IMAGE_NAME}:latest"
-
-                        app.push("${BUILD_NUMBER}")
-                        sh "docker push ${IMAGE_NAME}:latest"
-                    }
-
-                    // Nexus
-                    def nexusHost = sh(
-                        script: 'ping -c 1 nexus >/dev/null 2>&1 && echo "nexus" || echo "localhost"',
-                        returnStdout: true
-                    ).trim()
-
-                    echo "Usando Nexus host: ${nexusHost}"
-
-                    docker.withRegistry("http://${nexusHost}:8082", 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
-                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:${BUILD_NUMBER}"
-
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${nexusHost}:8082/${IMAGE_NAME}:latest"
-                        sh "docker push ${nexusHost}:8082/${IMAGE_NAME}:latest"
+                    // Push a Nexus con tags latest y BUILD_NUMBER
+                    docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
+                        sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                        sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:latest"
                     }
                 }
+            }
+        }
+
+        stage('Actualizar Kubernetes') {
+            steps {
+                sh '''
+                    echo "Aplicando configuración de Kubernetes..."
+                    kubectl --kubeconfig=${KUBE_CONFIG} apply -f ${DEPLOYMENT_FILE}
+                    
+                    echo "Validando pods en ejecución..."
+                    kubectl --kubeconfig=${KUBE_CONFIG} rollout status deployment/backend-app
+                '''
             }
         }
     }
