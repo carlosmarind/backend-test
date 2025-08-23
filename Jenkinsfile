@@ -46,20 +46,16 @@ pipeline {
             }
         }
 
-stage('Quality Assurance - SonarQube') {
-    steps {
-        withSonarQubeEnv('SonarQube server') {
-            sh 'npx sonarqube-scanner \
-                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                -Dsonar.sources=src \
-                -Dsonar.tests=src \
-                -Dsonar.test.inclusions=**/*.spec.ts \
-                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                -Dsonar.exclusions=node_modules/**,dist/** \
-                -Dsonar.coverage.exclusions=**/*.spec.ts \
-                -Dsonar.qualitygate.wait=true'
-        }
-    }
+withSonarQubeEnv('SonarQube Server') {
+    sh 'npx sonarqube-scanner \
+        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+        -Dsonar.sources=src \
+        -Dsonar.tests=src \
+        -Dsonar.test.inclusions=**/*.spec.ts \
+        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+        -Dsonar.exclusions=node_modules/**,dist/** \
+        -Dsonar.coverage.exclusions=**/*.spec.ts \
+        -Dsonar.qualitygate.wait=true'
 }
 
 
