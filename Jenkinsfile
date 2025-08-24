@@ -124,53 +124,49 @@ pipeline {
             }
         }
 
-   stage('Docker Build & Push') {
-    steps {
-        script {
-            // Variables
-            def nexusHost = "172.20.0.4:8082" // IP de nexus_repo
-            def imageTag = "${IMAGE_NAME}:${BUILD_TAG}"
+        stage('Docker Build & Push') {
+            steps {
+                script {
+                    def nexusHost = "172.20.0.4:8082"
+                    def imageTag = "${IMAGE_NAME}:${BUILD_TAG}"
 
-            withCredentials([
-                usernamePassword(credentialsId: 'NEXUS_CREDENTIALS_ID', 
-                                 passwordVariable: 'NEXUS_PASSWORD', 
-                                 usernameVariable: 'NEXUS_USER')
-            ]) {
-                sh """
-                    set -eux
+                    withCredentials([
+                        usernamePassword(credentialsId: 'nexus-credentials', 
+                                         passwordVariable: 'NEXUS_PASSWORD', 
+                                         usernameVariable: 'NEXUS_USER')
+                    ]) {
+                        sh """
+                            set -eux
 
-                    echo 'Eliminando imágenes antiguas...'
-                    docker images ${IMAGE_NAME} --format '{{.Repository}}:{{.Tag}}' | tail -n +6 | sort -r | xargs -r docker rmi -f || true
+                            echo 'Eliminando imágenes antiguas...'
+                            docker images ${IMAGE_NAME} --format '{{.Repository}}:{{.Tag}}' | tail -n +6 | sort -r | xargs -r docker rmi -f || true
 
-                    echo 'Login en Nexus...'
-                    echo "$NEXUS_PASSWORD" | docker login http://${nexusHost} -u "$NEXUS_USER" --password-stdin
+                            echo 'Login en Nexus...'
+                            echo "$NEXUS_PASSWORD" | docker login http://${nexusHost} -u "$NEXUS_USER" --password-stdin
 
-                    echo 'Construyendo imagen Docker...'
-                    docker build -t ${imageTag} .
+                            echo 'Construyendo imagen Docker...'
+                            docker build -t ${imageTag} .
 
-                    echo 'Tagueando imagen para Nexus...'
-                    docker tag ${imageTag} ${nexusHost}/${IMAGE_NAME}:${BUILD_TAG}
+                            echo 'Tagueando imagen para Nexus...'
+                            docker tag ${imageTag} ${nexusHost}/${IMAGE_NAME}:${BUILD_TAG}
 
-                    echo 'Pusheando imagen a Nexus...'
-                    docker push ${nexusHost}/${IMAGE_NAME}:${BUILD_TAG}
-                """
+                            echo 'Pusheando imagen a Nexus...'
+                            docker push ${nexusHost}/${IMAGE_NAME}:${BUILD_TAG}
+                        """
+                    }
+                }
             }
         }
-    }
-}
-
-
-
-
-
 
         stage('Verificar Nexus') {
             agent any
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'nexus-credentials', 
-                                                     usernameVariable: 'NEXUS_USER', 
-                                                     passwordVariable: 'NEXUS_PASSWORD')]) {
+                    withCredentials([
+                        usernamePassword(credentialsId: 'nexus-credentials', 
+                                         usernameVariable: 'NEXUS_USER', 
+                                         passwordVariable: 'NEXUS_PASSWORD')
+                    ]) {
                         sh '''
                             set -eux
                             echo "Verificando que la imagen Docker exista en Nexus..."

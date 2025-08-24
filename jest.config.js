@@ -1,19 +1,11 @@
 module.exports = {
-testTimeout: 60000,
-  collectCoverage: true,
-  coverageDirectory: 'coverage',
+  preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/*.spec.ts'],
+  collectCoverage: true,
   collectCoverageFrom: [
-"src/**/*.{ts,js}",
-  "!src/main.ts",            // Excluir main.ts
-  "!src/**/*.module.ts",
-  "!src/**/*.spec.ts",
-  "!src/config/configuration.ts",
-  "!src/coverage/**"
+    'src/**/*.ts',         // todos los .ts de src
+    '!src/**/*.spec.ts',   // excepto los tests
   ],
-  coverageReporters: ['lcov', 'text'],
-  transform: {
-    '^.+\\.(t|j)s$': 'ts-jest'
-  },
+  coverageDirectory: 'coverage',
+  coverageReporters: ['lcov', 'text-summary'],
 };
