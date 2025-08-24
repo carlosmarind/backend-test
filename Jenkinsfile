@@ -1,11 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'edgardobenavidesl/node-java-sonar-docker:latest'
-            args '-v /var/run/docker.sock:/var/run/docker.sock --network devnet'
-            reuseNode true
-        }
-    }
+    agent any
 
     environment {
         IMAGE_NAME = "backend-test"
@@ -22,42 +16,51 @@ pipeline {
 
         stage('Install dependencies') {
             steps {
-                sh 'npm ci'
+                // Ejecuta dentro del contenedor Node/Java
+                docker.image('edgardobenavidesl/node-java-sonar-docker:latest').inside('--network host') {
+                    sh 'npm ci'
+                }
             }
         }
 
         stage('Run tests & coverage') {
             steps {
-                sh '''
-                    npm run test:cov
-                    sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
-                    sed -i 's#\\\\#/#g' coverage/lcov.info
-                '''
+                docker.image('edgardobenavidesl/node-java-sonar-docker:latest').inside('--network host') {
+                    sh '''
+                        npm run test:cov
+                        sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
+                        sed -i 's#\\\\#/#g' coverage/lcov.info
+                    '''
+                }
             }
         }
 
         stage('Build app') {
             steps {
-                sh 'npm run build'
+                docker.image('edgardobenavidesl/node-java-sonar-docker:latest').inside('--network host') {
+                    sh 'npm run build'
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                            sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=src \
-                            -Dsonar.tests=src \
-                            -Dsonar.test.inclusions=**/*.spec.ts \
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.exclusions=node_modules/**,dist/** \
-                            -Dsonar.coverage.exclusions=**/*.spec.ts \
-                            -Dsonar.host.url=$SONAR_HOST_URL \
-                            -Dsonar.login=$SONAR_TOKEN
-                        '''
+                docker.image('edgardobenavidesl/node-java-sonar-docker:latest').inside('--network host') {
+                    withSonarQubeEnv('SonarQube') {
+                        withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
+                            sh '''
+                                sonar-scanner \
+                                -Dsonar.projectKey=backend-test \
+                                -Dsonar.sources=src \
+                                -Dsonar.tests=src \
+                                -Dsonar.test.inclusions=**/*.spec.ts \
+                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                                -Dsonar.exclusions=node_modules/**,dist/** \
+                                -Dsonar.coverage.exclusions=**/*.spec.ts \
+                                -Dsonar.host.url=$SONAR_HOST_URL \
+                                -Dsonar.login=$SONAR_TOKEN
+                            '''
+                        }
                     }
                 }
             }
@@ -75,8 +78,7 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
                     sh '''
-                        echo "Logging into Nexus..."
-                        docker login -u $NEXUS_USER -p $NEXUS_PASSWORD host.docker.internal:8081/dockerreponexus
+                        echo $NEXUS_PASSWORD | docker login host.docker.internal:8081/dockerreponexus --username $NEXUS_USER --password-stdin
                         docker build -t host.docker.internal:8081/dockerreponexus/${IMAGE_NAME}:$BUILD_TAG .
                         docker push host.docker.internal:8081/dockerreponexus/${IMAGE_NAME}:$BUILD_TAG
                     '''
