@@ -2,10 +2,11 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_TOOLING     = 'edgardobenavidesl/node-java-sonar-docker:latest'
-    SONAR_PROJECT_KEY = 'backend-test'
-    IMAGE_NAME        = 'edgardobenavidesl/backend-test'
-    BUILD_TAG         = "${new Date().format('yyyyMMddHHmmss')}"
+    IMAGE_TOOLING      = 'edgardobenavidesl/node-java-sonar-docker:latest'
+    SONAR_PROJECT_KEY  = 'backend-test'
+    NEXUS_REGISTRY     = 'nexus:8083'                 // AJUSTA si tu puerto/host es otro
+    IMAGE_NAME         = "${NEXUS_REGISTRY}/backend-test"
+    BUILD_TAG          = "${env.BUILD_NUMBER}"        // o tu timestamp si prefieres
     MAX_IMAGES_TO_KEEP = '5'
   }
 
@@ -73,37 +74,44 @@ pipeline {
       }
     }
 
-    stage('Quality Gate (optional)') {
-      when { expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') || currentBuild.currentResult == null } }
+    // stage('Quality Gate (optional)') {
+    //   when { expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') || currentBuild.currentResult == null } }
+    //   steps {
+    //     echo 'Quality Gate: habilítalo con waitForQualityGate() si usas webhooks.'
+    //   }
+    // }
+
+    stage('Quality Gate') {
       steps {
-        echo 'Quality Gate: habilítalo con waitForQualityGate() si usas webhooks.'
-      }
-    }
-
-    stage('Docker Build & Push') {
-  steps {
-    script {
-      docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-          sh '''
-            set -e
-            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
-            # Construir con dos tags
-            docker build -t "$IMAGE_NAME:$BUILD_TAG" -t "$IMAGE_NAME:latest" .
-
-            # Push de ambos tags
-            docker push "$IMAGE_NAME:$BUILD_TAG"
-            docker push "$IMAGE_NAME:latest"
-
-            # Limpieza local (opcional)
-            docker image prune -f
-          '''
+        timeout(time: 10, unit: 'MINUTES') {
+          waitForQualityGate()   // falla el build si no pasa el 90%
         }
       }
     }
-  }
-}
+
+    stage('Docker Build & Push (Nexus)') {
+      steps {
+        script {
+          docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
+            withCredentials([usernamePassword(
+              credentialsId: 'nexus-docker-cred',   // crea esta credencial en Jenkins
+              usernameVariable: 'NEXUS_USER',
+              passwordVariable: 'NEXUS_PASS'
+            )]) {
+              sh '''
+                set -e
+                echo "$NEXUS_PASS" | docker login -u "$NEXUS_USER" --password-stdin ''' + "${env.NEXUS_REGISTRY}" + '''
+                docker build -t ''' + "${env.IMAGE_NAME}:latest" + ''' -t ''' + "${env.IMAGE_NAME}:${BUILD_TAG}" + ''' .
+                docker push ''' + "${env.IMAGE_NAME}:${BUILD_TAG}" + '''
+                docker push ''' + "${env.IMAGE_NAME}:latest" + '''
+                docker image prune -f
+              '''
+            }
+          }
+        }
+      }
+    }
+
 
   }
 
