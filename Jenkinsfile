@@ -9,7 +9,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "gdiaz90/backend-test"
-        REGISTRY_NEXUS = "http://localhost:8082"
+        REGISTRY_NEXUS = "localhost:8082"
         REGISTRY_DOCKERHUB = "https://index.docker.io/v1/"
         K8S_NAMESPACE = "gdd"
     }
