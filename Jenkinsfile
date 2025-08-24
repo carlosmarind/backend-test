@@ -49,7 +49,7 @@ pipeline {
             }
         }
 
-      stage('SonarQube Analysis') {
+        stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
@@ -68,22 +68,20 @@ pipeline {
                 }
             }
         }
-    }
-}
 
-stage('Quality Gate') {
-    steps {
-        script {
-            timeout(time: 2, unit: 'MINUTES') { // ⏳ ajusta a tu realidad
-                echo "Checking SonarQube Quality Gate..."
-                def qg = waitForQualityGate abortPipeline: true
-                if (qg.status != "OK") {
-                    error "Quality Gate failed: ${qg.status}"
+        stage('Quality Gate') {
+            steps {
+                script {
+                    timeout(time: 2, unit: 'MINUTES') {
+                        echo "Checking SonarQube Quality Gate..."
+                        def qg = waitForQualityGate abortPipeline: true
+                        if (qg.status != "OK") {
+                            error "Quality Gate failed: ${qg.status}"
+                        }
+                    }
                 }
             }
         }
-    }
-}
 
         stage('Docker Build & Push') {
             steps {
@@ -107,6 +105,7 @@ stage('Quality Gate') {
                 }
             }
         }
+
     }
 
     post {
