@@ -1,8 +1,8 @@
 pipeline {
     agent {
         docker {
-        image 'edgardobenavidesl/node-java-sonar-docker:latest'
-        args '-v /var/run/docker.sock:/var/run/docker.sock --network devnet'
+            image 'edgardobenavidesl/node-java-sonar-docker:latest'
+            args '-v /var/run/docker.sock:/var/run/docker.sock --network devnet'
             reuseNode true
         }
     }
@@ -26,7 +26,7 @@ pipeline {
                 sh '''
                     echo "Installing dependencies..."
                     npm ci
-                    
+
                     echo "Running tests with coverage..."
                     npm run test:cov
 
@@ -65,7 +65,10 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                waitForQualityGate abortPipeline: true
+                script {
+                    echo "Waiting for SonarQube Quality Gate (timeout 10 min)..."
+                    waitForQualityGate abortPipeline: true, timeout: 10 * 60
+                }
             }
         }
 
