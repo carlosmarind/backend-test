@@ -83,28 +83,28 @@ pipeline {
             }
         }
 
-        stage('Docker Build & Push') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
-                    sh '''
-                        echo "Building Docker image..."
-                        docker build -t ${IMAGE_NAME}:${BUILD_TAG} -t ${IMAGE_NAME}:latest .
+            stage('Docker Build & Push') {
+                steps {
+                    withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
+                        sh '''
+                            echo "Building Docker image..."
+                            docker build -t ${IMAGE_NAME}:${BUILD_TAG} -t ${IMAGE_NAME}:latest .
 
-                        echo "Login to Nexus..."
-                        echo $NEXUS_PASSWORD | docker login http://nexus_repo:8081 -u $NEXUS_USER --password-stdin
+                            echo "Login to Nexus using IP..."
+                            echo $NEXUS_PASSWORD | docker login http://172.20.0.4:8081 -u $NEXUS_USER --password-stdin
 
-                        echo "Pushing image with build tag..."
-                        docker push ${IMAGE_NAME}:${BUILD_TAG}
+                            echo "Pushing image with build tag..."
+                            docker push ${IMAGE_NAME}:${BUILD_TAG}
 
-                        echo "Pushing image with latest tag..."
-                        docker push ${IMAGE_NAME}:latest
+                            echo "Pushing image with latest tag..."
+                            docker push ${IMAGE_NAME}:latest
 
-                        echo "Cleaning old images..."
-                        docker rmi $(docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" | sort -r | tail -n +6 || true) || true
-                    '''
+                            echo "Cleaning old images..."
+                            docker rmi $(docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" | sort -r | tail -n +6 || true) || true
+                        '''
+                    }
                 }
             }
-        }
 
     }
 
