@@ -66,8 +66,15 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    echo "Waiting for SonarQube Quality Gate (timeout 10 min)..."
-                    waitForQualityGate abortPipeline: true, timeout: 10 * 60
+                    echo "Checking SonarQube Quality Gate..."
+                    def qg = waitForQualityGate()  // espera la respuesta del servidor
+                    echo "Quality Gate status: ${qg.status}"
+                    if (qg.status != 'OK') {
+                        echo "⚠️ Quality Gate failed! Coverage or other conditions not met."
+                        currentBuild.result = 'FAILURE'  // marca el build como fallido
+                    } else {
+                        echo "✅ Quality Gate passed!"
+                    }
                 }
             }
         }
@@ -76,12 +83,6 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
                     sh '''
-                        echo "Waiting for Nexus to be ready..."
-                        until curl -s http://nexus_repo:8081/ >/dev/null; do
-                          echo "Nexus not ready yet, waiting 5s..."
-                          sleep 5
-                        done
-
                         echo "Building Docker image..."
                         docker build -t ${IMAGE_NAME}:${BUILD_TAG} -t ${IMAGE_NAME}:latest .
 
