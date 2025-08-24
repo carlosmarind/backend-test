@@ -22,7 +22,7 @@ export class OperacionesController {
     }
 
     return res
-      .status(502)
+      .status(422)
       .json({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
   }
 }
