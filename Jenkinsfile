@@ -11,26 +11,15 @@ pipeline {
     }
     stages {
         stage('Instalación de dependencias') {
-            steps { 
-                sh 'npm install' 
-            }
+            steps { sh 'npm install' }
         }
 
         stage('Pruebas automatizadas') {
-            steps {
-                sh '''
-                    export JEST_JUNIT_OUTPUT_NAME=junit.xml
-                    export JEST_JUNIT_SUITE_NAME=backend-test
-                    export JEST_JUNIT_SONAR_GENERIC=true
-                    npm run test:cov
-                '''
-            }
+            steps { sh 'npm run test:cov' }
         }
 
         stage('Construcción de aplicación') {
-            steps { 
-                sh 'npm run build' 
-            }
+            steps { sh 'npm run build' }
         }
 
         stage('Quality Assurance') {
@@ -45,7 +34,6 @@ pipeline {
                                 -Dsonar.tests=src \
                                 -Dsonar.test.inclusions=src/**/*.spec.ts \
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                -Dsonar.testExecutionReportPaths=junit.xml \
                                 -Dsonar.login=$SONAR_AUTH_TOKEN \
                                 -Dsonar.host.url=$SONAR_HOST_URL
                             '''
