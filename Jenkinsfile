@@ -81,13 +81,18 @@ pipeline {
     //   }
     // }
 
-    stage('Quality Gate') {
-      steps {
-        timeout(time: 10, unit: 'MINUTES') {
-          waitForQualityGate()   // falla el build si no pasa el 90%
-        }
+stage('Quality Gate') {
+  steps {
+    timeout(time: 10, unit: 'MINUTES') {
+      script {
+        // aborta automáticamente el pipeline si la QG falla (<90% en tu caso)
+        def qg = waitForQualityGate abortPipeline: true
+        echo "Quality Gate: ${qg.status}"
       }
     }
+  }
+}
+
 
     stage('Docker Build & Push (Nexus)') {
       steps {
