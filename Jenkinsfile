@@ -26,6 +26,24 @@ pipeline {
 				}
 			}
 		}
+		stage('QA Sonarqube'){
+			agent{
+				docker{
+					image 'sonarsource/sonar-scanner-cli'
+					args '--network devops-infra_default'
+					reusenode true
+				}
+			}
+			stages{
+				stage('Upload a Sonarqube'){
+					steps{
+						withSonarQubeEnv('SonarQube'){
+							sh 'sonar-scanner'
+						}
+					}
+				}
+			}
+		}
 		stage('Empaquetado y Delivery'){
 			steps{
 				script{
