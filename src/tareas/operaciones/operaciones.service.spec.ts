@@ -43,4 +43,10 @@ describe('OperacionesService', () => {
   it('should return undefined for unknown operation', () => {
     expect(service.operar(1, 1, 'unknown')).toBeUndefined();
   });
+
+  // --- NUEVO: cubrir parámetro por defecto ---
+  it('should return undefined if operation is not provided (default parameter)', () => {
+    expect(service.operar(1, 1)).toBeUndefined();
+  });
+
 });
