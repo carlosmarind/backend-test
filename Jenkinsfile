@@ -91,13 +91,9 @@ pipeline {
                     echo "Esperando 15s para que SonarQube procese el análisis..."
                     sleep 15
                     timeout(time: 10, unit: 'MINUTES') {
-                        def gate = waitForQualityGate()
-                        if (gate.status != 'OK') {
-                            def failedConditions = gate.conditions.findAll { it.status == 'ERROR' }
-                            failedConditions.each { cond ->
-                                echo "Fallo Quality Gate: ${cond.metricKey} = ${cond.actualValue} ${cond.operator} ${cond.errorThreshold}"
-                            }
-                            error "Pipeline detenido por Quality Gate"
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Pipeline detenido por Quality Gate: ${qg.status}"
                         } else {
                             echo "Quality Gate OK"
                         }
@@ -105,6 +101,7 @@ pipeline {
                 }
             }
         }
+
 
         stage('Build & Push Docker Image') {
             steps {
