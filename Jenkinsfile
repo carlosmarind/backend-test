@@ -75,17 +75,13 @@ pipeline {
         }
 
         stage('Docker Build & Push') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', 
-                                                usernameVariable: 'NEXUS_USER', 
-                                                passwordVariable: 'NEXUS_PASSWORD')]) {
-                    sh '''
-                        echo "Logging into Nexus..."
-                        docker login -u $NEXUS_USER -p $NEXUS_PASSWORD nexus.example.com
-                        docker tag backend-test:latest nexus.example.com/backend-test:latest
-                        docker push nexus.example.com/backend-test:latest
-                    '''
-                }
+            withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
+                sh """
+                    echo 'Logging into Nexus...'
+                    docker login -u $NEXUS_USER -p $NEXUS_PASSWORD host.docker.internal:8081/dockerreponexus
+                    docker build -t host.docker.internal:8081/dockerreponexus/backend-test:latest .
+                    docker push host.docker.internal:8081/dockerreponexus/backend-test:latest
+                """
             }
         }
 
