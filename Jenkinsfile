@@ -10,7 +10,8 @@ pipeline {
     environment {
         IMAGE_NAME = "backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
-        SONAR_HOST_URL = "http://sonarqube:9000"
+        NEXUS_URL = "http://host.docker.internal:8082" // HTTP explícito
+        NEXUS_REPO = "docker-repo" // tu repo en Nexus
     }
 
     stages {
@@ -22,21 +23,16 @@ pipeline {
 
         stage('Install dependencies') {
             steps {
-                sh '''
-                    echo "Installing dependencies..."
-                    npm ci
-                '''
+                sh 'npm ci'
             }
         }
 
         stage('Run tests & coverage') {
             steps {
+                sh 'npm run test:cov'
                 sh '''
-                    echo "Running tests with coverage..."
-                    npm run test:cov
-                    echo "Normalizing coverage paths for SonarQube..."
-                    sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
-                    sed -i 's#\\\\#/#g' coverage/lcov.info
+                sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
+                sed -i 's#\\\\#/#g' coverage/lcov.info
                 '''
             }
         }
@@ -48,14 +44,10 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            environment {
-                SONAR_TOKEN = credentials('sonarqube-cred')
-            }
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        echo "Running SonarQube analysis..."
-                        sonar-scanner \
+                    sh """
+                    sonar-scanner \
                         -Dsonar.projectKey=backend-test \
                         -Dsonar.sources=src \
                         -Dsonar.tests=src \
@@ -63,9 +55,9 @@ pipeline {
                         -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                         -Dsonar.exclusions=node_modules/**,dist/** \
                         -Dsonar.coverage.exclusions=**/*.spec.ts \
-                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.host.url=http://sonarqube:9000/ \
                         -Dsonar.login=$SONAR_TOKEN
-                    '''
+                    """
                 }
             }
         }
@@ -80,40 +72,31 @@ pipeline {
 
         stage('Docker Build & Push') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'nexus-credentials', 
-                    usernameVariable: 'NEXUS_USER', 
-                    passwordVariable: 'NEXUS_PASSWORD'
-                )]) {
-                    script {
-                        echo 'Building Docker image...'
-                        sh 'docker build -t backend-test:latest .'
+                script {
+                    echo "Building Docker image..."
+                    sh "docker build -t $IMAGE_NAME:$BUILD_TAG ."
 
-                        // Usando host.docker.internal para acceder al host desde Docker Desktop
-                        def nexusHost = 'host.docker.internal'
+                    echo "Logging into Nexus (HTTP insecure registry)..."
+                    // Forzar HTTP y evitar HTTPS
+                    sh """
+                    mkdir -p ~/.docker
+                    echo '{ "insecure-registries":["host.docker.internal:8082"] }' > ~/.docker/daemon.json
+                    docker login $NEXUS_URL -u $NEXUS_USER --password-stdin <<< $NEXUS_PASSWORD
+                    """
 
-                        echo "Logging into Nexus at ${nexusHost}..."
-                        sh """
-                            echo $NEXUS_PASSWORD | docker login http://${nexusHost}:8082 -u $NEXUS_USER --password-stdin
-                        """
-
-                        echo 'Pushing Docker image to Nexus...'
-                        sh "docker tag backend-test:latest ${nexusHost}:8082/backend-test:latest"
-                        sh "docker push ${nexusHost}:8082/backend-test:latest"
-
-                        // Tag con build
-                        sh "docker tag backend-test:latest ${nexusHost}:8082/backend-test:${BUILD_TAG}"
-                        sh "docker push ${nexusHost}:8082/backend-test:${BUILD_TAG}"
-                    }
+                    echo "Tagging and pushing image..."
+                    sh """
+                    docker tag $IMAGE_NAME:$BUILD_TAG $NEXUS_URL/$NEXUS_REPO/$IMAGE_NAME:$BUILD_TAG
+                    docker push $NEXUS_URL/$NEXUS_REPO/$IMAGE_NAME:$BUILD_TAG
+                    """
                 }
             }
         }
-
     }
 
     post {
         always {
-            echo "Cleaning workspace..."
+            echo 'Cleaning workspace...'
             deleteDir()
         }
     }
