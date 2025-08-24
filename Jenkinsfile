@@ -8,79 +8,68 @@ pipeline {
     }
 
     environment {
-        IMAGE_NAME = "edgardobenavidesl/backend-test"
+        IMAGE_NAME = "backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
-        SONAR_HOST_URL = "http://sonarqube:9000"
-        NEXUS_IP = "172.20.0.4"   // IP del contenedor Nexus en la red devnet
-        NEXUS_PORT = "8082"
+        SONAR_HOST_URL = "http://sonarqube:9000/"
     }
 
     stages {
-
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Instalación de dependencias') {
+        stage('Install dependencies') {
             steps {
-                sh '''
-                    echo "Installing dependencies..."
-                    npm ci
-                '''
+                sh 'echo Installing dependencies...'
+                sh 'npm ci'
             }
         }
 
-        stage('Ejecución de pruebas automatizadas') {
+        stage('Run tests & coverage') {
             steps {
-                sh '''
-                    echo "Running tests with coverage..."
-                    npm run test:cov
-
-                    echo "Normalizing coverage paths for SonarQube..."
-                    sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
-                    sed -i 's|\\\\|/|g' coverage/lcov.info
-                '''
+                sh 'echo Running tests with coverage...'
+                sh 'npm run test:cov'
+                sh 'echo Normalizing coverage paths for SonarQube...'
+                sh "sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info"
+                sh "sed -i 's|\\\\|/|g' coverage/lcov.info"
             }
         }
 
-        stage('Construcción de aplicación') {
+        stage('Build app') {
             steps {
                 sh 'npm run build'
             }
         }
 
         stage('SonarQube Analysis') {
+            environment {
+                SONAR_TOKEN = credentials('sonar-token')
+            }
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        echo "Running SonarQube analysis..."
-                        sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=src \
-                            -Dsonar.tests=src \
-                            -Dsonar.test.inclusions=**/*.spec.ts \
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.exclusions=node_modules/**,dist/** \
-                            -Dsonar.coverage.exclusions=**/*.spec.ts \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.login=${SONAR_AUTH_TOKEN}
-                    '''
+                    sh """
+                    echo Running SonarQube analysis...
+                    sonar-scanner \
+                        -Dsonar.projectKey=${IMAGE_NAME} \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=src \
+                        -Dsonar.test.inclusions=**/*.spec.ts \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                        -Dsonar.exclusions=node_modules/**,dist/** \
+                        -Dsonar.coverage.exclusions=**/*.spec.ts \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.login=${SONAR_TOKEN}
+                    """
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                script {
-                    timeout(time: 2, unit: 'MINUTES') {
-                        echo "Checking SonarQube Quality Gate..."
-                        def qg = waitForQualityGate abortPipeline: true
-                        if (qg.status != "OK") {
-                            error "Quality Gate failed: ${qg.status}"
-                        }
-                    }
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
@@ -89,24 +78,31 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
                     sh """
-                        echo 'Building Docker image...'
-                        docker build -t backend-test:latest .
-
-                        echo 'Login to Nexus...'
-                        echo \$NEXUS_PASSWORD | docker login http://${NEXUS_IP}:${NEXUS_PORT} -u \$NEXUS_USER --password-stdin
-
-                        docker tag backend-test:latest ${NEXUS_IP}:${NEXUS_PORT}/dockerreponexus/backend-test:latest
-                        docker push ${NEXUS_IP}:${NEXUS_PORT}/dockerreponexus/backend-test:latest
+                    echo Building Docker image...
+                    docker build -t ${IMAGE_NAME}:latest .
+                    
+                    echo Logging into Nexus...
+                    echo $NEXUS_PASSWORD | docker login http://localhost:8082 -u $NEXUS_USER --password-stdin
+                    
+                    docker tag ${IMAGE_NAME}:latest localhost:8082/${IMAGE_NAME}:latest
+                    docker push localhost:8082/${IMAGE_NAME}:latest
+                    
+                    docker logout http://localhost:8082
                     """
                 }
             }
         }
-
     }
 
     post {
         always {
-            sh 'docker logout http://${NEXUS_IP}:${NEXUS_PORT} || true'
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline finished successfully.'
+        }
+        failure {
+            echo 'Pipeline failed.'
         }
     }
 }
