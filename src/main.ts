@@ -13,7 +13,7 @@ export async function bootstrap() {
 }
 
 // Solo ejecutar si es el archivo principal
-
+/* istanbul ignore next */
 if (require.main === module) {
   bootstrap().catch((e) => console.log(`Error al iniciar la aplicacion: ${e}`));
 }
