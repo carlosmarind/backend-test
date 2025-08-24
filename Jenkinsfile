@@ -125,33 +125,47 @@ pipeline {
         }
 
         stage('Docker Build & Push') {
-            agent any // Ejecuta en host Jenkins directamente
-            steps {
-                script {
-                    def maxImages = MAX_IMAGES_TO_KEEP.toInteger() + 1
-
-                    sh '''
-                        set -eux
-                        echo "Eliminando imágenes antiguas..."
-                        docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
-                        | sort -r | tail -n +${maxImages} | xargs -r docker rmi -f || true
-
-                        echo "Construyendo nueva imagen Docker..."
-                        docker build -t ${IMAGE_NAME}:${BUILD_TAG} .
-                    '''
-
-                    docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
-                        sh '''
-                            set -eux
-                            docker tag ${IMAGE_NAME}:${BUILD_TAG} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_TAG}
-                            docker tag ${IMAGE_NAME}:${BUILD_TAG} ${NEXUS_URL}/${IMAGE_NAME}:latest
-                            docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_TAG}
-                            docker push ${NEXUS_URL}/${IMAGE_NAME}:latest
-                        '''
-                    }
-                }
-            }
+    agent {
+        docker {
+            image 'docker:24.0.5-dind'  // Contenedor con Docker dentro
+            args '--network devnet -v /var/run/docker.sock:/var/run/docker.sock'
+            reuseNode true
         }
+    }
+    environment {
+        NEXUS_USER = credentials('nexus-credentials').username
+        NEXUS_PASSWORD = credentials('nexus-credentials').password
+    }
+    steps {
+        script {
+            def maxImages = MAX_IMAGES_TO_KEEP.toInteger() + 1
+
+            sh '''
+                set -eux
+
+                # Limpiar imágenes antiguas
+                echo "Eliminando imágenes antiguas..."
+                docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
+                | sort -r | tail -n +${maxImages} | xargs -r docker rmi -f || true
+
+                # Login en Nexus
+                echo "Haciendo login en Nexus..."
+                echo $NEXUS_PASSWORD | docker login http://nexus_repo:8082 -u $NEXUS_USER --password-stdin
+
+                # Construir imagen
+                echo "Construyendo nueva imagen Docker..."
+                docker build -t ${IMAGE_NAME}:${BUILD_TAG} .
+
+                # Tag y push
+                docker tag ${IMAGE_NAME}:${BUILD_TAG} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_TAG}
+                docker tag ${IMAGE_NAME}:${BUILD_TAG} ${NEXUS_URL}/${IMAGE_NAME}:latest
+                docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_TAG}
+                docker push ${NEXUS_URL}/${IMAGE_NAME}:latest
+            '''
+        }
+    }
+}
+
 
         stage('Verificar Nexus') {
             agent any
