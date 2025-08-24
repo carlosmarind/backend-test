@@ -99,7 +99,7 @@ stage('Quality Gate') {
         script {
           docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
             withCredentials([usernamePassword(
-              credentialsId: 'nexus-docker-cred',   // crea esta credencial en Jenkins
+              credentialsId: 'nexus-credentials',   // crea esta credencial en Jenkins
               usernameVariable: 'NEXUS_USER',
               passwordVariable: 'NEXUS_PASS'
             )]) {
