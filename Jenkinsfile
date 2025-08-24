@@ -78,25 +78,32 @@ stage('Run tests & coverage') {
             }
         }
 
-        stage('Docker Build & Push') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
-                    sh """
-                        echo 'Building Docker image...'
-                        docker build -t backend-test:latest .
+       stage('Docker Build & Push') {
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'nexus-credentials', 
+            usernameVariable: 'NEXUS_USER', 
+            passwordVariable: 'NEXUS_PASSWORD'
+        )]) {
+            script {
+                echo 'Building Docker image...'
+                sh 'docker build -t backend-test:latest .'
 
-                        echo 'Logging into Nexus...'
-                        echo \$NEXUS_PASSWORD | docker login http://host.docker.internal:8082 -u \$NEXUS_USER --password-stdin
+                // IP del host donde corre Nexus
+                def nexusHost = '172.17.0.1' // Ajusta según tu red / WSL2
 
-                        echo 'Tagging image for Nexus...'
-                        docker tag backend-test:latest host.docker.internal:8082/backend-test:latest
+                echo "Logging into Nexus at ${nexusHost}..."
+                sh """
+                    echo $NEXUS_PASSWORD | docker login http://${nexusHost}:8082 -u $NEXUS_USER --password-stdin
+                """
 
-                        echo 'Pushing image to Nexus...'
-                        docker push host.docker.internal:8082/backend-test:latest
-                    """
-                }
+                echo 'Pushing Docker image to Nexus...'
+                sh "docker tag backend-test:latest ${nexusHost}:8082/backend-test:latest"
+                sh "docker push ${nexusHost}:8082/backend-test:latest"
             }
         }
+    }
+}
     }
 
     post {
