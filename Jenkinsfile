@@ -4,7 +4,7 @@ pipeline {
   environment {
     IMAGE_TOOLING      = 'edgardobenavidesl/node-java-sonar-docker:latest'
     SONAR_PROJECT_KEY  = 'backend-test'
-    NEXUS_REGISTRY     = 'nexus:8083'                 // AJUSTA si tu puerto/host es otro
+    NEXUS_REGISTRY     = 'nexus:8082'                 // AJUSTA si tu puerto/host es otro
     IMAGE_NAME         = "${NEXUS_REGISTRY}/backend-test"
     BUILD_TAG          = "${env.BUILD_NUMBER}"        // o tu timestamp si prefieres
     MAX_IMAGES_TO_KEEP = '5'
@@ -94,28 +94,28 @@ stage('Quality Gate') {
 }
 
 
-    stage('Docker Build & Push (Nexus)') {
-      steps {
-        script {
-          docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
-            withCredentials([usernamePassword(
-              credentialsId: 'nexus-credentials',   // crea esta credencial en Jenkins
-              usernameVariable: 'NEXUS_USER',
-              passwordVariable: 'NEXUS_PASS'
-            )]) {
-              sh '''
-                set -e
-                echo "$NEXUS_PASS" | docker login -u "$NEXUS_USER" --password-stdin ''' + "${env.NEXUS_REGISTRY}" + '''
-                docker build -t ''' + "${env.IMAGE_NAME}:latest" + ''' -t ''' + "${env.IMAGE_NAME}:${BUILD_TAG}" + ''' .
-                docker push ''' + "${env.IMAGE_NAME}:${BUILD_TAG}" + '''
-                docker push ''' + "${env.IMAGE_NAME}:latest" + '''
-                docker image prune -f
-              '''
-            }
+  stage('Docker Build & Push (Nexus)') {
+    steps {
+      script {
+        docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
+          withCredentials([usernamePassword(
+            credentialsId: 'nexus-credentials',
+            usernameVariable: 'NEXUS_USER',
+            passwordVariable: 'NEXUS_PASS'
+          )]) {
+            sh '''
+              set -e
+              echo "$NEXUS_PASS" | docker login -u "$NEXUS_USER" --password-stdin ''' + "${env.NEXUS_REGISTRY}" + '''
+              docker build -t ''' + "${env.IMAGE_NAME}:${BUILD_TAG}" + ''' -t ''' + "${env.IMAGE_NAME}:latest" + ''' .
+              docker push ''' + "${env.IMAGE_NAME}:${BUILD_TAG}" + '''
+              docker push ''' + "${env.IMAGE_NAME}:latest" + '''
+              docker image prune -f
+            '''
           }
         }
       }
     }
+  }
 
 
   }
