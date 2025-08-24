@@ -85,7 +85,7 @@ pipeline {
         stage('Push Nexus') {
             steps {
                 script {
-                    docker.withRegistry(REGISTRY_NEXUS, 'nexus-credentials') {
+                    docker.withRegistry("http://${REGISTRY_NEXUS}", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${REGISTRY_NEXUS}/${IMAGE_NAME}:${BUILD_NUMBER}"
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${REGISTRY_NEXUS}/${IMAGE_NAME}:latest"
 
