@@ -49,25 +49,25 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        echo "Running SonarQube analysis..."
-                        sonar-scanner \
-                            -Dsonar.projectKey=backend-test \
-                            -Dsonar.sources=src \
-                            -Dsonar.tests=src \
-                            -Dsonar.test.inclusions=**/*.spec.ts \
-                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                            -Dsonar.exclusions=node_modules/**,dist/** \
-                            -Dsonar.coverage.exclusions=**/*.spec.ts \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.token=${SONAR_AUTH_TOKEN}
-                    '''
-                }
-            }
+       stage('SonarQube Analysis') {
+    steps {
+        withSonarQubeEnv('SonarQube') {
+            sh '''
+                echo "Running SonarQube analysis..."
+                sonar-scanner `
+                    --define "sonar.projectKey=backend-test" `
+                    --define "sonar.sources=src" `
+                    --define "sonar.tests=src" `
+                    --define "sonar.test.inclusions=**/*.spec.ts" `
+                    --define "sonar.javascript.lcov.reportPaths=coverage/lcov.info" `
+                    --define "sonar.exclusions=node_modules/**,dist/**" `
+                    --define "sonar.coverage.exclusions=**/*.spec.ts" `
+                    --define "sonar.host.url=${SONAR_HOST_URL}" `
+                    --define "sonar.login=${SONAR_AUTH_TOKEN}"
+            '''
         }
+    }
+}
 
 stage('Quality Gate') {
     steps {

@@ -16,34 +16,35 @@ describe('OperacionesService', () => {
     expect(service).toBeDefined();
   });
 
-  // Tabla de pruebas para todas las operaciones
-  const operacionesTest: {
-    a: number;
-    b: number;
-    op: string;
-    expected: number | undefined;
-  }[] = [
-    { a: 2, b: 3, op: 'suma', expected: 5 },
-    { a: 5, b: 3, op: 'resta', expected: 2 },
-    { a: 2, b: 3, op: 'multiplicacion', expected: 6 },
-    { a: 6, b: 3, op: 'division', expected: 2 },
-    { a: 6, b: 0, op: 'division', expected: NaN },
-    { a: 0, b: 5, op: 'division', expected: 0 },
-    { a: 1, b: 1, op: 'unknown', expected: undefined },
-    { a: 4, b: 5, op: '', expected: undefined }, // default operation
-  ];
+  it('should perform sum correctly', () => {
+    expect(service.operar(2, 3, 'suma')).toBe(5);
+  });
 
-  operacionesTest.forEach(({ a, b, op, expected }) => {
-    it(`should return ${expected} for operar(${a}, ${b}, '${op}')`, () => {
-      const result = service.operar(a, b, op);
+  it('should perform subtraction correctly', () => {
+    expect(service.operar(5, 3, 'resta')).toBe(2);
+  });
 
-      if (expected === undefined) {
-        expect(result).toBeUndefined();
-      } else if (typeof expected === 'number' && isNaN(expected)) {
-        expect(result).toBeNaN();
-      } else {
-        expect(result).toBe(expected);
-      }
-    });
+  it('should perform multiplication correctly', () => {
+    expect(service.operar(2, 3, 'multiplicacion')).toBe(6);
+  });
+
+  it('should perform division correctly', () => {
+    expect(service.operar(6, 3, 'division')).toBe(2);
+  });
+
+  it('should return NaN when dividing by zero', () => {
+    expect(service.operar(6, 0, 'division')).toBeNaN();
+  });
+
+  it('should return 0 when numerator is 0', () => {
+    expect(service.operar(0, 5, 'division')).toBe(0);
+  });
+
+  it('should return undefined for unknown operation', () => {
+    expect(service.operar(1, 1, 'unknown')).toBeUndefined();
+  });
+
+  it('should use default operation when not provided', () => {
+    expect(service.operar(4, 5)).toBeUndefined();
   });
 });
