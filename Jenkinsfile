@@ -9,21 +9,30 @@ pipeline {
 
     stages {
         stage('Checkout SCM') {
-            agent { docker { image 'edgardobenavidesl/node-java-sonar-docker:latest' args '--network host' } }
             steps {
                 checkout scm
             }
         }
 
         stage('Install dependencies') {
-            agent { docker { image 'edgardobenavidesl/node-java-sonar-docker:latest' args '--network host' } }
+            agent {
+                docker {
+                    image 'edgardobenavidesl/node-java-sonar-docker:latest'
+                    args '--network host'
+                }
+            }
             steps {
                 sh 'npm ci'
             }
         }
 
         stage('Run tests & coverage') {
-            agent { docker { image 'edgardobenavidesl/node-java-sonar-docker:latest' args '--network host' } }
+            agent {
+                docker {
+                    image 'edgardobenavidesl/node-java-sonar-docker:latest'
+                    args '--network host'
+                }
+            }
             steps {
                 sh '''
                     npm run test:cov
@@ -34,14 +43,24 @@ pipeline {
         }
 
         stage('Build app') {
-            agent { docker { image 'edgardobenavidesl/node-java-sonar-docker:latest' args '--network host' } }
+            agent {
+                docker {
+                    image 'edgardobenavidesl/node-java-sonar-docker:latest'
+                    args '--network host'
+                }
+            }
             steps {
                 sh 'npm run build'
             }
         }
 
         stage('SonarQube Analysis') {
-            agent { docker { image 'edgardobenavidesl/node-java-sonar-docker:latest' args '--network host' } }
+            agent {
+                docker {
+                    image 'edgardobenavidesl/node-java-sonar-docker:latest'
+                    args '--network host'
+                }
+            }
             steps {
                 withSonarQubeEnv('SonarQube') {
                     withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
@@ -63,7 +82,6 @@ pipeline {
         }
 
         stage('Quality Gate') {
-            agent { docker { image 'edgardobenavidesl/node-java-sonar-docker:latest' args '--network host' } }
             steps {
                 timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -72,12 +90,10 @@ pipeline {
         }
 
         stage('Docker Build & Push') {
-            agent { docker { image 'edgardobenavidesl/node-java-sonar-docker:latest' args '--network host' } }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
                     sh '''
-                        echo "Logging into Nexus..."
-                        docker login -u $NEXUS_USER -p $NEXUS_PASSWORD host.docker.internal:8081/dockerreponexus
+                        echo $NEXUS_PASSWORD | docker login host.docker.internal:8081/dockerreponexus --username $NEXUS_USER --password-stdin
                         docker build -t host.docker.internal:8081/dockerreponexus/${IMAGE_NAME}:$BUILD_TAG .
                         docker push host.docker.internal:8081/dockerreponexus/${IMAGE_NAME}:$BUILD_TAG
                     '''
