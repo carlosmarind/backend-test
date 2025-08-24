@@ -1,8 +1,8 @@
 pipeline {
     agent {
         docker {
-            image 'edgardobenavidesl/node-java-sonar-docker:latest' // Imagen universal
-            args '-v /var/run/docker.sock:/var/run/docker.sock --network devnet'
+        image 'edgardobenavidesl/node-java-sonar-docker:latest'
+        args '-v /var/run/docker.sock:/var/run/docker.sock --network devnet'
             reuseNode true
         }
     }

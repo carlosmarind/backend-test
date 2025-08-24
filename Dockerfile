@@ -1,4 +1,4 @@
-# Imagen base con Node.js 22
+# Imagen base con Node.js 22 y Alpine
 FROM node:22-alpine
 
 # Instalar Java 17, Docker CLI, bash, curl, unzip, git
@@ -16,6 +16,9 @@ RUN curl -sSL https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/so
     && unzip /tmp/sonar-scanner.zip -d /opt \
     && mv /opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux $SONAR_SCANNER_HOME \
     && rm /tmp/sonar-scanner.zip
+
+# Desactivar el uso del JRE embebido y usar el Java del sistema
+RUN sed -i 's|use_embedded_jre=true|use_embedded_jre=false|' ${SONAR_SCANNER_HOME}/bin/sonar-scanner
 
 # Agregar SonarScanner al PATH
 ENV PATH="${SONAR_SCANNER_HOME}/bin:${PATH}"
