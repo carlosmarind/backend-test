@@ -136,7 +136,6 @@ pipeline {
         script {
             def maxImages = MAX_IMAGES_TO_KEEP.toInteger() + 1
 
-            // Usamos withCredentials para exponer variables temporalmente
             withCredentials([usernamePassword(credentialsId: 'nexus-credentials', 
                                              usernameVariable: 'NEXUS_USER', 
                                              passwordVariable: 'NEXUS_PASSWORD')]) {
@@ -148,8 +147,8 @@ pipeline {
                     docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
                     | sort -r | tail -n +${maxImages} | xargs -r docker rmi -f || true
 
-                    # Login en Nexus
-                    echo $NEXUS_PASSWORD | docker login http://nexus_repo:8082 -u $NEXUS_USER --password-stdin
+                    # Login en Nexus (usar HTTP y el host de red Docker)
+                    echo $NEXUS_PASSWORD | docker login http://${NEXUS_URL} -u $NEXUS_USER --password-stdin
 
                     # Construir imagen
                     echo "Construyendo nueva imagen Docker..."
@@ -165,6 +164,7 @@ pipeline {
         }
     }
 }
+
 
 
 
