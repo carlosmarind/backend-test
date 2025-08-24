@@ -1,8 +1,9 @@
 pipeline {
     agent {
         docker {
-            image 'edgardobenavidesl/node-with-docker-cli:22'
+            image 'edgardobenavidesl/node-java-sonar-docker:latest' // Imagen universal
             args '-v /var/run/docker.sock:/var/run/docker.sock --network devnet'
+            reuseNode true
         }
     }
 
@@ -23,9 +24,13 @@ pipeline {
         stage('Install Dependencies & Test') {
             steps {
                 sh '''
+                    echo "Installing dependencies..."
                     npm ci
+                    
+                    echo "Running tests with coverage..."
                     npm run test:cov
-                    # Normalizar paths para Sonar
+
+                    echo "Normalizing coverage paths for SonarQube..."
                     sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
                     sed -i 's|\\\\|/|g' coverage/lcov.info
                 '''
@@ -42,7 +47,8 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                        npx sonarqube-scanner \
+                        echo "Running SonarQube analysis..."
+                        sonar-scanner \
                             -Dsonar.projectKey=backend-test \
                             -Dsonar.sources=src \
                             -Dsonar.tests=src \
@@ -65,7 +71,7 @@ pipeline {
 
         stage('Docker Build & Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
+                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
                     sh '''
                         echo "Building Docker image..."
                         docker build -t ${IMAGE_NAME}:${BUILD_TAG} .
