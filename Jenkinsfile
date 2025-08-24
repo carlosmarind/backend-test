@@ -99,7 +99,7 @@ pipeline {
         stage('Validación y Deploy a Kubernetes') {
             agent {
                 docker {
-                    image 'lachlanevenson/k8s-kubectl:latest'
+                    image 'gdiaz90/node-with-docker-cli-k8s:22' // <- Aquí usamos tu nueva imagen
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                     reuseNode true
                 }
