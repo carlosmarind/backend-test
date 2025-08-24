@@ -1,24 +1,17 @@
 pipeline {
   agent any
 
-  options {
-    timestamps()
-    ansiColor('xterm')
-  }
-
   environment {
-    IMAGE_TOOLING   = 'edgardobenavidesl/node-java-sonar-docker:latest' // Node + Java + Sonar + Docker CLI
+    IMAGE_TOOLING     = 'edgardobenavidesl/node-java-sonar-docker:latest'
     SONAR_PROJECT_KEY = 'backend-test'
-    IMAGE_NAME      = 'edgardobenavidesl/backend-test'                  // Cambia si usas otro registry
-    BUILD_TAG       = "${new Date().format('yyyyMMddHHmmss')}"
+    IMAGE_NAME        = 'edgardobenavidesl/backend-test'
+    BUILD_TAG         = "${new Date().format('yyyyMMddHHmmss')}"
     MAX_IMAGES_TO_KEEP = '5'
   }
 
   stages {
     stage('Checkout SCM') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Install dependencies') {
@@ -37,7 +30,6 @@ pipeline {
           docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
             sh '''
               npm run test:cov
-              # Normaliza rutas del lcov para Sonar en Linux/Windows
               sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
               sed -i 's#\\\\#/#g' coverage/lcov.info
             '''
@@ -84,12 +76,7 @@ pipeline {
     stage('Quality Gate (optional)') {
       when { expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') || currentBuild.currentResult == null } }
       steps {
-        script {
-          // Si tienes configurado el webhook de Sonar hacia Jenkins, puedes activar:
-          // def qg = waitForQualityGate()
-          // if (qg.status != 'OK') { error "Quality Gate: ${qg.status}" }
-          echo 'Quality Gate: habilítalo con waitForQualityGate() si usas webhooks.'
-        }
+        echo 'Quality Gate: habilítalo con waitForQualityGate() si usas webhooks.'
       }
     }
 
@@ -101,19 +88,11 @@ pipeline {
               sh '''
                 set -e
                 echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
-                # Tags
                 IMAGE_TAG_LATEST='''' + "${env.IMAGE_NAME}:latest" + ''''
                 IMAGE_TAG_BUILD='''' + "${env.IMAGE_NAME}:${env.BUILD_TAG}" + ''''
-
-                # Build
                 docker build -t "$IMAGE_TAG_BUILD" -t "$IMAGE_TAG_LATEST" .
-
-                # Push
                 docker push "$IMAGE_TAG_BUILD"
                 docker push "$IMAGE_TAG_LATEST"
-
-                # (Opcional) Limpieza local en el agente
                 docker image prune -f
               '''
             }
@@ -124,8 +103,6 @@ pipeline {
   }
 
   post {
-    always {
-      cleanWs()
-    }
+    always { cleanWs() }
   }
 }
