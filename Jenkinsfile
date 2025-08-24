@@ -26,21 +26,20 @@ pipeline {
             }
         }
 
-    stage('Ejecución de pruebas con cobertura') {
-        steps {
-            sh '''
-                npm run test:cov
-                if [ ! -f coverage/lcov.info ]; then
-                    echo "ERROR: No se generó coverage/lcov.info"
-                    exit 1
-                fi
-                echo "Normalizando rutas en lcov.info..."
-                sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
-                sed -i 's|\\\\|/|g' coverage/lcov.info
-            '''
+        stage('Ejecución de pruebas con cobertura') {
+            steps {
+                sh '''
+                    npm run test:cov
+                    if [ ! -f coverage/lcov.info ]; then
+                        echo "ERROR: No se generó coverage/lcov.info"
+                        exit 1
+                    fi
+                    echo "Normalizando rutas en lcov.info..."
+                    sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
+                    sed -i 's|\\\\|/|g' coverage/lcov.info
+                '''
+            }
         }
-    }
-
 
         stage('Build aplicación') {
             steps {
@@ -102,6 +101,20 @@ pipeline {
             }
         }
 
+        stage('Verificar Nexus') {
+            steps {
+                script {
+                    echo "Verificando que ${NEXUS_URL} sea resolvible..."
+                    sh '''
+                        if ! curl -sSf http://${NEXUS_URL} > /dev/null; then
+                            echo "No se puede conectar a ${NEXUS_URL}"
+                            exit 1
+                        fi
+                        echo "Conexión exitosa a ${NEXUS_URL}"
+                    '''
+                }
+            }
+        }
 
         stage('Build & Push Docker Image') {
             steps {
@@ -114,11 +127,6 @@ pipeline {
                     """
 
                     def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
-
-                    sh """
-                        echo "Verificando que ${NEXUS_URL} sea resolvible..."
-                        ping -c 1 \$(echo ${NEXUS_URL} | cut -d':' -f1) || exit 1
-                    """
 
                     docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
                         sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
