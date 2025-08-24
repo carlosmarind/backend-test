@@ -29,17 +29,17 @@ pipeline {
             }
         }
 
-        stage('Run tests & coverage') {
-            steps {
-                sh '''
-                    echo "Running tests with coverage..."
-                    npm run test:cov
-                    echo "Normalizing coverage paths for SonarQube..."
-                    sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
-                    sed -i 's|\\|/|g' coverage/lcov.info
-                '''
-            }
-        }
+stage('Run tests & coverage') {
+    steps {
+        sh '''
+            echo "Running tests with coverage..."
+            npm run test:cov
+            echo "Normalizing coverage paths for SonarQube..."
+            sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
+            sed -i 's#\\\\#/#g' coverage/lcov.info
+        '''
+    }
+}
 
         stage('Build app') {
             steps {
