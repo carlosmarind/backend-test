@@ -128,7 +128,7 @@ pipeline {
     agent {
         docker {
             image 'docker:24.0.5-dind'
-            args '--network devnet -v /var/run/docker.sock:/var/run/docker.sock'
+            args '--network devnet -v /var/run/docker.sock:/var/run/docker.sock --entrypoint="" --add-host=nexus_repo:172.20.0.4'
             reuseNode true
         }
     }
@@ -139,31 +139,31 @@ pipeline {
             withCredentials([usernamePassword(credentialsId: 'nexus-credentials', 
                                              usernameVariable: 'NEXUS_USER', 
                                              passwordVariable: 'NEXUS_PASSWORD')]) {
-                sh '''
+                sh """
                     set -eux
 
-                    # Limpiar imágenes antiguas
                     echo "Eliminando imágenes antiguas..."
                     docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
-                    | sort -r | tail -n +${maxImages} | xargs -r docker rmi -f || true
+                        | sort -r | tail -n +${maxImages} | xargs -r docker rmi -f || true
 
-                    # Login en Nexus (usar HTTP y el host de red Docker)
+                    echo "Login en Nexus..."
                     echo $NEXUS_PASSWORD | docker login http://${NEXUS_URL} -u $NEXUS_USER --password-stdin
 
-                    # Construir imagen
                     echo "Construyendo nueva imagen Docker..."
                     docker build -t ${IMAGE_NAME}:${BUILD_TAG} .
 
-                    # Tag y push
+                    echo "Tag y push de la imagen..."
                     docker tag ${IMAGE_NAME}:${BUILD_TAG} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_TAG}
                     docker tag ${IMAGE_NAME}:${BUILD_TAG} ${NEXUS_URL}/${IMAGE_NAME}:latest
+
                     docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_TAG}
                     docker push ${NEXUS_URL}/${IMAGE_NAME}:latest
-                '''
+                """
             }
         }
     }
 }
+
 
 
 
