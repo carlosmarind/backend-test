@@ -101,20 +101,23 @@ pipeline {
             }
         }
 
-        stage('Verificar Nexus') {
-            steps {
-                script {
-                    echo "Verificando que ${NEXUS_URL} sea accesible..."
-                    sh '''
-                        if ! curl -sSf http://${NEXUS_URL}/service/rest/v1/status > /dev/null; then
-                            echo "No se puede conectar a ${NEXUS_URL}"
-                            exit 1
-                        fi
-                        echo "Conexión exitosa a ${NEXUS_URL}"
-                    '''
-                }
-            }
+stage('Verificar Nexus') {
+    steps {
+        withCredentials([usernamePassword(credentialsId: 'nexus-credentials', 
+                                         usernameVariable: 'NEXUS_USER', 
+                                         passwordVariable: 'NEXUS_PASSWORD')]) {
+            sh '''
+                echo "Verificando que Nexus sea accesible..."
+                if ! curl -sSf -u $NEXUS_USER:$NEXUS_PASSWORD http://nexus_repo:8081/service/rest/v1/status; then
+                    echo "No se puede conectar a Nexus"
+                    exit 1
+                fi
+                echo "Nexus OK"
+            '''
         }
+    }
+}
+
 
 
         stage('Build & Push Docker Image') {
