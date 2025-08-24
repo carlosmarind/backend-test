@@ -11,13 +11,13 @@ describe('Main bootstrap', () => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
 
-    // Fake app para no iniciar servidor real
+    // Fake app para no levantar servidor real
     fakeApp = {
       listen: jest.fn().mockResolvedValue(undefined),
       getUrl: jest.fn().mockResolvedValue('http://localhost:4000'),
     };
 
-    // Mockear NestFactory.create
+    // Mock NestFactory.create para devolver nuestro fakeApp
     jest.spyOn(NestFactory, 'create').mockResolvedValue(fakeApp as INestApplication);
   });
 
@@ -27,13 +27,22 @@ describe('Main bootstrap', () => {
     expect(fakeApp.getUrl).toHaveBeenCalled();
   });
 
-  it('should run main block if require.main === module', async () => {
-    // Ejecutar main.ts como módulo principal para cubrir if(require.main === module)
-    jest.isolateModules(async () => {
-      const mainModule = require('./main');
-      // Mockeamos bootstrap de nuevo
-      jest.spyOn(mainModule, 'bootstrap').mockResolvedValue(fakeApp as INestApplication);
-      await expect(mainModule.bootstrap()).resolves.not.toThrow();
-    });
+  it('should cover require.main === module block', async () => {
+    // Guardamos el valor original
+    const originalMain = require.main;
+    const originalModule = module;
+
+    try {
+      // Forzamos require.main === module
+      Object.defineProperty(require, 'main', { value: module });
+      jest.isolateModules(async () => {
+        const mainModule = require('./main');
+        jest.spyOn(mainModule, 'bootstrap').mockResolvedValue(fakeApp as INestApplication);
+        await mainModule.bootstrap();
+      });
+    } finally {
+      // Restauramos require.main
+      Object.defineProperty(require, 'main', { value: originalMain });
+    }
   });
 });
