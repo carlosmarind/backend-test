@@ -93,7 +93,7 @@
         "@casualbot/jest-sonar-reporter",
         {
           "outputDirectory": "coverage",
-          "outputName": "test-report.xml",
+          "outputName": "junit.xml",
           "relativePaths": true
         }
       ]
