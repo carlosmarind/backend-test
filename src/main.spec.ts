@@ -9,10 +9,7 @@ describe('Main bootstrap', () => {
   });
 
   afterAll(() => {
-    Object.defineProperty(require, 'main', {
-      value: originalMain,
-      writable: true,
-    });
+    (require as any).main = originalMain;
   });
 
   it('should execute bootstrap without throwing', async () => {
@@ -29,10 +26,11 @@ describe('Main bootstrap', () => {
   });
 
   it('should cover require.main === module block', async () => {
-    // Forzamos require.main === module
-    Object.defineProperty(require, 'main', { value: module, writable: true });
+    (require as any).main = module;
 
-    const mainModule = require('./main');
-    await mainModule.bootstrap();
+    await jest.isolateModulesAsync(async () => {
+      const mainModule = require('./main');
+      await mainModule.bootstrap();
+    });
   });
 });
