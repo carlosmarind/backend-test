@@ -81,25 +81,30 @@ pipeline {
     }
 
     stage('Docker Build & Push') {
-      steps {
-        script {
-          docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
-            withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-              sh '''
-                set -e
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                IMAGE_TAG_LATEST='''' + "${env.IMAGE_NAME}:latest" + ''''
-                IMAGE_TAG_BUILD='''' + "${env.IMAGE_NAME}:${env.BUILD_TAG}" + ''''
-                docker build -t "$IMAGE_TAG_BUILD" -t "$IMAGE_TAG_LATEST" .
-                docker push "$IMAGE_TAG_BUILD"
-                docker push "$IMAGE_TAG_LATEST"
-                docker image prune -f
-              '''
-            }
-          }
+  steps {
+    script {
+      docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          sh '''
+            set -e
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+            # Construir con dos tags
+            docker build -t "$IMAGE_NAME:$BUILD_TAG" -t "$IMAGE_NAME:latest" .
+
+            # Push de ambos tags
+            docker push "$IMAGE_NAME:$BUILD_TAG"
+            docker push "$IMAGE_NAME:latest"
+
+            # Limpieza local (opcional)
+            docker image prune -f
+          '''
         }
       }
     }
+  }
+}
+
   }
 
   post {
