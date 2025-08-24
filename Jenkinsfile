@@ -78,23 +78,23 @@ stage('Run tests & coverage') {
             }
         }
 
-        stage('Docker Build & Push') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
-                    sh '''
-                        echo "Building Docker image..."
-                        docker build -t ${IMAGE_NAME}:latest .
-                        
-                        echo "Logging into Nexus..."
-                        echo $NEXUS_PASSWORD | docker login http://nexus:8082 -u $NEXUS_USER --password-stdin
-                        
-                        echo "Tagging and pushing image..."
-                        docker tag ${IMAGE_NAME}:latest nexus:8082/${IMAGE_NAME}:latest
-                        docker push nexus:8082/${IMAGE_NAME}:latest
-                    '''
-                }
-            }
-        }
+stage('Docker Build & Push') {
+    withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
+        sh """
+        echo 'Building Docker image...'
+        docker build -t backend-test:latest .
+
+        echo 'Logging into Nexus...'
+        echo \$NEXUS_PASSWORD | docker login http://host.docker.internal:8082 -u \$NEXUS_USER --password-stdin
+
+        echo 'Tagging image for Nexus...'
+        docker tag backend-test:latest host.docker.internal:8082/backend-test:latest
+
+        echo 'Pushing image to Nexus...'
+        docker push host.docker.internal:8082/backend-test:latest
+        """
+    }
+}
     }
 
     post {
