@@ -99,7 +99,7 @@ pipeline {
         stage('Validación y Deploy a Kubernetes') {
             agent {
                 docker {
-                    image 'lachlanevenson/k8s-kubectl:v1.30.0' // Imagen con kubectl preinstalado
+                    image 'lachlanevenson/k8s-kubectl:latest'
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                     reuseNode true
                 }
