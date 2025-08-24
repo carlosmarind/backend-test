@@ -53,7 +53,7 @@ pipeline {
         script {
           docker.image(env.IMAGE_TOOLING).inside('--network devnet') {
             withSonarQubeEnv('SonarQube') {
-              withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+              withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
                 sh '''
                   sonar-scanner \
                     -Dsonar.projectKey=''' + env.SONAR_PROJECT_KEY + ''' \
