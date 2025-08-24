@@ -76,14 +76,23 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
                     sh '''
+                        echo "Waiting for Nexus to be ready..."
+                        until curl -s http://nexus_repo:8081/ >/dev/null; do
+                          echo "Nexus not ready yet, waiting 5s..."
+                          sleep 5
+                        done
+
                         echo "Building Docker image..."
-                        docker build -t ${IMAGE_NAME}:${BUILD_TAG} .
+                        docker build -t ${IMAGE_NAME}:${BUILD_TAG} -t ${IMAGE_NAME}:latest .
 
                         echo "Login to Nexus..."
                         echo $NEXUS_PASSWORD | docker login http://nexus_repo:8081 -u $NEXUS_USER --password-stdin
 
-                        echo "Pushing image..."
+                        echo "Pushing image with build tag..."
                         docker push ${IMAGE_NAME}:${BUILD_TAG}
+
+                        echo "Pushing image with latest tag..."
+                        docker push ${IMAGE_NAME}:latest
 
                         echo "Cleaning old images..."
                         docker rmi $(docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" | sort -r | tail -n +6 || true) || true
