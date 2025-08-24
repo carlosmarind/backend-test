@@ -26,5 +26,15 @@ pipeline {
 				}
 			}
 		}
+		stage('Empaquetado y Delivery'){
+			steps{
+				script{
+					docker.withRegistry('http://localhost:8082', 'nexus-credentials'){	
+						sh 'docker tag backend-test:ftr localhost:8082/backend-test:ftr'
+						sh 'docker push localhost:8082/backend-test:ftr'
+					}
+				}
+			}
+		}
 	}
 }
