@@ -104,9 +104,9 @@ pipeline {
         stage('Verificar Nexus') {
             steps {
                 script {
-                    echo "Verificando que ${NEXUS_URL} sea resolvible..."
+                    echo "Verificando que ${NEXUS_URL} sea accesible..."
                     sh '''
-                        if ! curl -sSf http://${NEXUS_URL} > /dev/null; then
+                        if ! curl -sSf http://${NEXUS_URL}/service/rest/v1/status > /dev/null; then
                             echo "No se puede conectar a ${NEXUS_URL}"
                             exit 1
                         fi
@@ -115,6 +115,7 @@ pipeline {
                 }
             }
         }
+
 
         stage('Build & Push Docker Image') {
             steps {
