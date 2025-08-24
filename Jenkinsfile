@@ -15,18 +15,24 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Install Dependencies & Test') {
+        stage('Instalación de dependencias') {
             steps {
                 sh '''
                     echo "Installing dependencies..."
                     npm ci
+                '''
+            }
+        }
 
+        stage('Ejecución de pruebas automatizadas') {
+            steps {
+                sh '''
                     echo "Running tests with coverage..."
                     npm run test:cov
 
@@ -37,7 +43,7 @@ pipeline {
             }
         }
 
-        stage('Build App') {
+        stage('Construcción de aplicación') {
             steps {
                 sh 'npm run build'
             }
@@ -63,30 +69,17 @@ pipeline {
             }
         }
 
-    stage('Quality Gate') {
-        steps {
-            script {
-                echo "Checking SonarQube Quality Gate..."
-                def timeoutSeconds = 600 // 10 minutos
-                def sleepInterval = 10
-                def elapsed = 0
-                def status = "IN_PROGRESS"
-
-                while (status == "IN_PROGRESS" && elapsed < timeoutSeconds) {
-                    sleep(sleepInterval)
-                    elapsed += sleepInterval
-                    def qg = waitForQualityGate abortPipeline: false
-                    status = qg.status
-                    echo "Status: ${status}"
-                }
-
-                if (status != "OK") {
-                    error "Quality Gate failed with status: ${status}"
+        stage('Quality Gate') {
+            steps {
+                script {
+                    echo "Checking SonarQube Quality Gate..."
+                    def qg = waitForQualityGate abortPipeline: true
+                    if (qg.status != "OK") {
+                        error "Quality Gate failed: ${qg.status}"
+                    }
                 }
             }
         }
-    }
-
 
         stage('Docker Build & Push') {
             steps {
