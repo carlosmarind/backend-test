@@ -11,6 +11,8 @@ pipeline {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
         SONAR_HOST_URL = "http://sonarqube:9000"
+        NEXUS_IP = "172.20.0.4"   // IP del contenedor Nexus en la red devnet
+        NEXUS_PORT = "8082"
     }
 
     stages {
@@ -91,10 +93,10 @@ pipeline {
                         docker build -t backend-test:latest .
 
                         echo 'Login to Nexus...'
-                        echo \$NEXUS_PASSWORD | docker login http://nexus_repo:8082 -u \$NEXUS_USER --password-stdin
+                        echo \$NEXUS_PASSWORD | docker login http://${NEXUS_IP}:${NEXUS_PORT} -u \$NEXUS_USER --password-stdin
 
-                        docker tag backend-test:latest nexus_repo:8082/dockerreponexus/backend-test:latest
-                        docker push nexus_repo:8082/dockerreponexus/backend-test:latest
+                        docker tag backend-test:latest ${NEXUS_IP}:${NEXUS_PORT}/dockerreponexus/backend-test:latest
+                        docker push ${NEXUS_IP}:${NEXUS_PORT}/dockerreponexus/backend-test:latest
                     """
                 }
             }
@@ -104,7 +106,7 @@ pipeline {
 
     post {
         always {
-            sh 'docker logout http://nexus_repo:8082 || true'
+            sh 'docker logout http://${NEXUS_IP}:${NEXUS_PORT} || true'
         }
     }
 }
