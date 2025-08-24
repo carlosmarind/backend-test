@@ -1,11 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'cimg/node:22.2.0'
-            args '--network devnet -v /var/run/docker.sock:/var/run/docker.sock'
-            reuseNode true
-        }
-    }
+    agent any
 
     environment {
         IMAGE_NAME = "edgardobenavidesl/backend-test"
@@ -19,21 +13,32 @@ pipeline {
         SONAR_AUTH_TOKEN = credentials('sonarqube-cred')
     }
 
-    stages {
-        stage('Instalación de dependencias') {
-            steps {
-                sh 'npm ci'
-            }
-        }
+    options {
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+    }
 
-        stage('Ejecución de pruebas con cobertura') {
+    stages {
+
+        stage('Instalación de dependencias y tests') {
+            agent {
+                docker {
+                    image 'cimg/node:22.2.0'
+                    args '--network devnet'
+                    reuseNode true
+                }
+            }
             steps {
                 sh '''
+                    set -eux
+                    npm ci
                     npm run test:cov
+
                     if [ ! -f coverage/lcov.info ]; then
                         echo "ERROR: No se generó coverage/lcov.info"
                         exit 1
                     fi
+
                     echo "Normalizando rutas en lcov.info..."
                     sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
                     sed -i 's|\\\\|/|g' coverage/lcov.info
@@ -42,25 +47,51 @@ pipeline {
         }
 
         stage('Build aplicación') {
-            steps {
-                sh 'npm run build'
+            agent {
+                docker {
+                    image 'cimg/node:22.2.0'
+                    args '--network devnet'
+                    reuseNode true
+                }
             }
-        }
-
-        stage('Debug SonarQube desde contenedor') {
             steps {
                 sh '''
-                    echo "Probando conexión desde el contenedor del pipeline..."
-                    curl -s -u ${SONAR_AUTH_TOKEN}: ${SONAR_HOST_URL}/api/system/health || echo "No se pudo conectar desde contenedor"
+                    set -eux
+                    npm run build
                 '''
             }
         }
 
-        stage('Quality Assurance - SonarQube') {
+        stage('Debug SonarQube desde contenedor') {
+            agent {
+                docker {
+                    image 'cimg/node:22.2.0'
+                    args '--network devnet'
+                    reuseNode true
+                }
+            }
+            steps {
+                sh '''
+                    set -eux
+                    echo "Probando conexión a SonarQube desde contenedor..."
+                    curl -v -u ${SONAR_AUTH_TOKEN}: ${SONAR_HOST_URL}/api/system/health || echo "No se pudo conectar desde contenedor"
+                '''
+            }
+        }
+
+        stage('Análisis SonarQube') {
+            agent {
+                docker {
+                    image 'cimg/node:22.2.0'
+                    args '--network devnet'
+                    reuseNode true
+                }
+            }
             steps {
                 script {
                     withSonarQubeEnv('SonarQube') {
-                        sh """
+                        sh '''
+                            set -eux
                             npx sonarqube-scanner \
                                 -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                                 -Dsonar.sources=src \
@@ -71,16 +102,9 @@ pipeline {
                                 -Dsonar.coverage.exclusions=**/*.spec.ts \
                                 -Dsonar.host.url=${SONAR_HOST_URL} \
                                 -Dsonar.token=${SONAR_AUTH_TOKEN}
-                        """
+                        '''
                     }
                 }
-            }
-        }
-
-        stage('Debug SonarQube desde Jenkins (Master)') {
-            steps {
-                echo "Probando conexión desde el nodo Jenkins (host donde corre waitForQualityGate)..."
-                sh 'curl -s http://sonarqube:9000/api/system/health || echo "No se pudo conectar desde Jenkins Master"'
             }
         }
 
@@ -101,51 +125,56 @@ pipeline {
             }
         }
 
-stage('Verificar Nexus') {
-    steps {
-        script {
-            withCredentials([usernamePassword(credentialsId: 'nexus-credentials', 
-                                             usernameVariable: 'NEXUS_USER', 
-                                             passwordVariable: 'NEXUS_PASSWORD')]) {
-                sh """
-                echo "Verificando que la imagen Docker exista en Nexus..."
-                RESPONSE=\$(curl -s -u $NEXUS_USER:$NEXUS_PASSWORD \
-                    "http://nexus_repo:8081/service/rest/v1/components?repository=dockerreponexus" \
-                    | grep "$IMAGE_NAME" | grep "$BUILD_TAG" || true)
-
-                if [ -z "\$RESPONSE" ]; then
-                    echo "No se encontró la imagen $IMAGE_NAME:$BUILD_TAG en Nexus"
-                    exit 1
-                else
-                    echo "Imagen $IMAGE_NAME:$BUILD_TAG encontrada en Nexus"
-                fi
-                """
-            }
-        }
-    }
-}
-
-
-
-
-
-        stage('Build & Push Docker Image') {
+        stage('Docker Build & Push') {
+            agent any // Ejecuta en host Jenkins directamente
             steps {
                 script {
                     def maxImages = MAX_IMAGES_TO_KEEP.toInteger() + 1
 
-                    sh """
+                    sh '''
+                        set -eux
+                        echo "Eliminando imágenes antiguas..."
                         docker images ${IMAGE_NAME} --format "{{.Repository}}:{{.Tag}}" \
                         | sort -r | tail -n +${maxImages} | xargs -r docker rmi -f || true
-                    """
 
-                    def app = docker.build("${IMAGE_NAME}:${BUILD_NUMBER}")
+                        echo "Construyendo nueva imagen Docker..."
+                        docker build -t ${IMAGE_NAME}:${BUILD_TAG} .
+                    '''
 
                     docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
-                        sh "docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${NEXUS_URL}/${IMAGE_NAME}:latest"
-                        sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_NUMBER}"
-                        sh "docker push ${NEXUS_URL}/${IMAGE_NAME}:latest"
+                        sh '''
+                            set -eux
+                            docker tag ${IMAGE_NAME}:${BUILD_TAG} ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_TAG}
+                            docker tag ${IMAGE_NAME}:${BUILD_TAG} ${NEXUS_URL}/${IMAGE_NAME}:latest
+                            docker push ${NEXUS_URL}/${IMAGE_NAME}:${BUILD_TAG}
+                            docker push ${NEXUS_URL}/${IMAGE_NAME}:latest
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Verificar Nexus') {
+            agent any
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'nexus-credentials', 
+                                                     usernameVariable: 'NEXUS_USER', 
+                                                     passwordVariable: 'NEXUS_PASSWORD')]) {
+                        sh '''
+                            set -eux
+                            echo "Verificando que la imagen Docker exista en Nexus..."
+                            RESPONSE=$(curl -s -u $NEXUS_USER:$NEXUS_PASSWORD \
+                                "http://nexus_repo:8081/service/rest/v1/components?repository=dockerreponexus" \
+                                | grep "$IMAGE_NAME" | grep "$BUILD_TAG" || true)
+
+                            if [ -z "$RESPONSE" ]; then
+                                echo "No se encontró la imagen $IMAGE_NAME:$BUILD_TAG en Nexus"
+                                exit 1
+                            else
+                                echo "Imagen $IMAGE_NAME:$BUILD_TAG encontrada en Nexus"
+                            fi
+                        '''
                     }
                 }
             }
