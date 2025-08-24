@@ -76,26 +76,19 @@ pipeline {
 
         stage('Docker Build & Push') {
             steps {
-                script {
-                    echo "Building Docker image..."
-                    sh "docker build -t $IMAGE_NAME:$BUILD_TAG ."
-
-                    echo "Logging into Nexus (HTTP insecure registry)..."
-                    // Forzar HTTP y evitar HTTPS
-                    sh """
-                    mkdir -p ~/.docker
-                    echo '{ "insecure-registries":["host.docker.internal:8082"] }' > ~/.docker/daemon.json
-                    docker login $NEXUS_URL -u $NEXUS_USER --password-stdin <<< $NEXUS_PASSWORD
-                    """
-
-                    echo "Tagging and pushing image..."
-                    sh """
-                    docker tag $IMAGE_NAME:$BUILD_TAG $NEXUS_URL/$NEXUS_REPO/$IMAGE_NAME:$BUILD_TAG
-                    docker push $NEXUS_URL/$NEXUS_REPO/$IMAGE_NAME:$BUILD_TAG
-                    """
+                withCredentials([usernamePassword(credentialsId: 'nexus-cred', 
+                                                usernameVariable: 'NEXUS_USER', 
+                                                passwordVariable: 'NEXUS_PASSWORD')]) {
+                    sh '''
+                        echo "Logging into Nexus..."
+                        docker login -u $NEXUS_USER -p $NEXUS_PASSWORD nexus.example.com
+                        docker tag backend-test:latest nexus.example.com/backend-test:latest
+                        docker push nexus.example.com/backend-test:latest
+                    '''
                 }
             }
         }
+
     }
 
     post {
