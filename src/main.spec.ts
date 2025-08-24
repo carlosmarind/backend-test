@@ -1,26 +1,31 @@
-// src/main.spec.ts
 import { bootstrap } from './main';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
 
 describe('Main bootstrap', () => {
+  let fakeApp: Partial<INestApplication>;
+
   beforeAll(() => {
-    // Opcional: silenciar logs
+    // Silenciar logs
     jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+
+    // Fake app para no iniciar un servidor real
+    fakeApp = {
+      listen: jest.fn().mockResolvedValue(undefined),
+      getUrl: jest.fn().mockResolvedValue('http://localhost:4000'),
+    };
+    
+    // Mockear NestFactory.create para devolver fakeApp
+    jest.spyOn(NestFactory, 'create').mockResolvedValue(fakeApp as INestApplication);
   });
 
   it('should execute bootstrap without throwing', async () => {
-    // Creamos un fakeApp que simula el servidor
-    const fakeApp = {
-      listen: jest.fn(),
-      enableShutdownHooks: jest.fn(),
-      use: jest.fn(),
-      close: jest.fn(),
-    } as unknown as INestApplication;
-
-    // Mockeamos bootstrap para que devuelva nuestro fakeApp
-    jest.spyOn(require('./main'), 'bootstrap').mockResolvedValue(fakeApp);
-
-    // Ejecutamos bootstrap y verificamos que no lance error
     await expect(bootstrap()).resolves.not.toThrow();
+
+    // Opcional: verificar que listen y getUrl fueron llamados
+    expect(fakeApp.listen).toHaveBeenCalled();
+    expect(fakeApp.getUrl).toHaveBeenCalled();
   });
 });
