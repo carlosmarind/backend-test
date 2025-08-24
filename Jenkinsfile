@@ -84,17 +84,19 @@ pipeline {
         }
 
         stage('Docker Build & Push') {
-            withCredentials([usernamePassword(credentialsId: 'nexus-admin', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
-                sh """
-                    echo 'Building Docker image...'
-                    docker build -t backend-test:latest .
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'nexus-admin', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
+                    sh """
+                        echo 'Building Docker image...'
+                        docker build -t backend-test:latest .
 
-                    echo 'Login to Nexus...'
-                    echo \$NEXUS_PASSWORD | docker login http://nexus_repo:8082 -u \$NEXUS_USER --password-stdin
+                        echo 'Login to Nexus...'
+                        echo \$NEXUS_PASSWORD | docker login http://nexus_repo:8082 -u \$NEXUS_USER --password-stdin
 
-                    docker tag backend-test:latest nexus_repo:8082/dockerreponexus/backend-test:latest
-                    docker push nexus_repo:8082/dockerreponexus/backend-test:latest
-                """
+                        docker tag backend-test:latest nexus_repo:8082/dockerreponexus/backend-test:latest
+                        docker push nexus_repo:8082/dockerreponexus/backend-test:latest
+                    """
+                }
             }
         }
 
@@ -102,7 +104,7 @@ pipeline {
 
     post {
         always {
-            sh 'docker logout http://nexus_repo:8081 || true'
+            sh 'docker logout http://nexus_repo:8082 || true'
         }
     }
 }
