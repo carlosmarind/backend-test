@@ -76,7 +76,7 @@ pipeline {
 
         stage('Docker Build & Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'nexus-cred', 
+                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', 
                                                 usernameVariable: 'NEXUS_USER', 
                                                 passwordVariable: 'NEXUS_PASSWORD')]) {
                     sh '''
