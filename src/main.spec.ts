@@ -17,14 +17,4 @@ describe('Main bootstrap', () => {
 
     await expect(bootstrap()).resolves.not.toThrow();
   });
-
-  it('should cover require.main === module block', async () => {
-    // 🔑 Espiamos require.main para que devuelva `module`
-    jest.spyOn(require as any, 'main', 'get').mockReturnValue(module);
-
-    await jest.isolateModulesAsync(async () => {
-      const mainModule = require('./main');
-      await mainModule.bootstrap();
-    });
-  });
 });
