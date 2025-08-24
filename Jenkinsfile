@@ -63,21 +63,30 @@ pipeline {
             }
         }
 
-        stage('Quality Gate') {
-            steps {
-                script {
-                    echo "Checking SonarQube Quality Gate..."
-                    def qg = waitForQualityGate()  // espera la respuesta del servidor
-                    echo "Quality Gate status: ${qg.status}"
-                    if (qg.status != 'OK') {
-                        echo "⚠️ Quality Gate failed! Coverage or other conditions not met."
-                        currentBuild.result = 'FAILURE'  // marca el build como fallido
-                    } else {
-                        echo "✅ Quality Gate passed!"
-                    }
+    stage('Quality Gate') {
+        steps {
+            script {
+                echo "Checking SonarQube Quality Gate..."
+                def timeoutSeconds = 600 // 10 minutos
+                def sleepInterval = 10
+                def elapsed = 0
+                def status = "IN_PROGRESS"
+
+                while (status == "IN_PROGRESS" && elapsed < timeoutSeconds) {
+                    sleep(sleepInterval)
+                    elapsed += sleepInterval
+                    def qg = waitForQualityGate abortPipeline: false
+                    status = qg.status
+                    echo "Status: ${status}"
+                }
+
+                if (status != "OK") {
+                    error "Quality Gate failed with status: ${status}"
                 }
             }
         }
+    }
+
 
         stage('Docker Build & Push') {
             steps {
