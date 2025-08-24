@@ -26,8 +26,8 @@ services:
     restart: always
     ports:
       - "8080:8080"
-    environment:
-      DOCKER_HOST: tcp://docker:2375
+   # environment:
+   #   DOCKER_HOST: tcp://docker:2375
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock   # permite usar Docker del host
