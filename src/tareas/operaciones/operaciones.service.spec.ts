@@ -43,4 +43,23 @@ describe('OperacionesService', () => {
   it('should return undefined for unknown operation', () => {
     expect(service.operar(1, 1, 'unknown')).toBeUndefined();
   });
+
+  it('should use default operation when not provided', () => {
+  // Llama a operar sin el tercer argumento
+  expect(service.operar(4, 5)).toBeUndefined(); // el valor por defecto es ''
+});
+
+it('should perform all operations correctly', () => {
+  expect(service.operar(2, 3, 'suma')).toBe(5);
+  expect(service.operar(5, 3, 'resta')).toBe(2);
+  expect(service.operar(2, 3, 'multiplicacion')).toBe(6);
+  expect(service.operar(6, 3, 'division')).toBe(2);
+  expect(service.operar(6, 0, 'division')).toBeNaN();
+  expect(service.operar(0, 5, 'division')).toBe(0);
+});
+
+it('should return undefined for unknown operation', () => {
+  expect(service.operar(1, 1, 'unknown')).toBeUndefined();
+});
+
 });
