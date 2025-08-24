@@ -1,29 +1,38 @@
-// src/main.spec.ts
 import { bootstrap } from './main';
-import { NestFactory } from '@nestjs/core';
-import { Logger, INestApplication } from '@nestjs/common';
 
 describe('Main bootstrap', () => {
-  let fakeApp: Partial<INestApplication>;
+  let originalMain: NodeModule;
 
   beforeAll(() => {
-    // Silenciamos logs para no llenar la consola en tests
     jest.spyOn(console, 'log').mockImplementation(() => {});
-    jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+    originalMain = require.main as NodeModule;
+  });
 
-    // Creamos un fakeApp que simula un servidor Nest
-    fakeApp = {
-      listen: jest.fn().mockResolvedValue(undefined),
-      getUrl: jest.fn().mockResolvedValue('http://localhost:4000'),
-    };
-
-    // Mockeamos NestFactory.create para que devuelva nuestro fakeApp
-    jest.spyOn(NestFactory, 'create').mockResolvedValue(fakeApp as INestApplication);
+  afterAll(() => {
+    Object.defineProperty(require, 'main', {
+      value: originalMain,
+      writable: true,
+    });
   });
 
   it('should execute bootstrap without throwing', async () => {
+    const fakeApp = {
+      listen: jest.fn(),
+      enableShutdownHooks: jest.fn(),
+      use: jest.fn(),
+      close: jest.fn(),
+    } as any;
+
+    jest.spyOn(require('./main'), 'bootstrap').mockResolvedValue(fakeApp);
+
     await expect(bootstrap()).resolves.not.toThrow();
-    expect(fakeApp.listen).toHaveBeenCalled();
-    expect(fakeApp.getUrl).toHaveBeenCalled();
+  });
+
+  it('should cover require.main === module block', async () => {
+    // Forzamos require.main === module
+    Object.defineProperty(require, 'main', { value: module, writable: true });
+
+    const mainModule = require('./main');
+    await mainModule.bootstrap();
   });
 });

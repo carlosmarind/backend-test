@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export class OperacionesService {
+export class OperacionesService {  // <-- export aquí
   operar(a: number, b: number, operacion: string = '') {
     if (operacion === 'suma') {
       return this.#suma(a, b);
