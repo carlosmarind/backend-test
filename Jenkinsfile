@@ -1,4 +1,4 @@
-pipeline {
+pipeline { 
     agent {
         docker {
             image 'gdiaz90/node-with-docker-cli:22'
@@ -96,19 +96,14 @@ pipeline {
             }
         }
 
-        stage('Instalar kubectl') {
-            steps {
-                sh '''
-                    apk add --no-cache curl
-                    curl -LO "https://dl.k8s.io/release/$(curl -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                    chmod +x kubectl
-                    mv kubectl /usr/local/bin/
-                    kubectl version --client
-                '''
-            }
-        }
-
         stage('Validación y Deploy a Kubernetes') {
+            agent {
+                docker {
+                    image 'lachlanevenson/k8s-kubectl:v1.30.0' // Imagen con kubectl preinstalado
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                    reuseNode true
+                }
+            }
             steps {
                 withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
                     sh '''
