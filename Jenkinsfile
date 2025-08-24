@@ -99,7 +99,7 @@ pipeline {
         stage('Validación y Deploy a Kubernetes') {
             agent {
                 docker {
-                    image 'gdiaz90/node-with-docker-cli-k8s:22' // <- Aquí usamos tu nueva imagen
+                    image 'gdiaz90/node-with-docker-cli-k8s:22'
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                     reuseNode true
                 }
@@ -116,12 +116,12 @@ pipeline {
                         # Aplicamos manifiestos YAML
                         kubectl apply -f kubernetes.yaml -n ${K8S_NAMESPACE} --validate=false
 
-                        # Actualizamos deployment con imagen inmutable
+                        # Actualizamos deployment con imagen del pipeline
                         TARGET_IMAGE=${REGISTRY_NEXUS}/${IMAGE_NAME}:${BUILD_NUMBER}
                         kubectl -n ${K8S_NAMESPACE} set image deployment/backend-test backend=${TARGET_IMAGE}
 
-                        # Esperamos rollout exitoso
-                        kubectl -n ${K8S_NAMESPACE} rollout status deployment/backend-test --timeout=180s
+                        # Esperamos rollout exitoso (300s por si tarda el pull)
+                        kubectl -n ${K8S_NAMESPACE} rollout status deployment/backend-test --timeout=300s
 
                         # Estado post-despliegue
                         kubectl -n ${K8S_NAMESPACE} get deploy backend-test -o wide
