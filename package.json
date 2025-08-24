@@ -90,11 +90,12 @@
     "reporters": [
       "default",
       [
-        "@casualbot/jest-sonar-reporter",
+        "jest-junit",
         {
           "outputDirectory": ".",
           "outputName": "junit.xml",
-          "relativePaths": true
+          "suiteName": "backend-test",
+          "sonarFormat": true
         }
       ]
     ]
