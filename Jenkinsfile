@@ -10,8 +10,7 @@ pipeline {
     environment {
         IMAGE_NAME = "backend-test"
         BUILD_TAG = "${new Date().format('yyyyMMddHHmmss')}"
-        NEXUS_URL = "http://host.docker.internal:8082" // HTTP explícito
-        NEXUS_REPO = "docker-repo" // tu repo en Nexus
+        SONAR_HOST_URL = "http://sonarqube:9000"
     }
 
     stages {
@@ -29,10 +28,10 @@ pipeline {
 
         stage('Run tests & coverage') {
             steps {
-                sh 'npm run test:cov'
                 sh '''
-                sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
-                sed -i 's#\\\\#/#g' coverage/lcov.info
+                    npm run test:cov
+                    sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
+                    sed -i 's#\\\\#/#g' coverage/lcov.info
                 '''
             }
         }
@@ -45,26 +44,24 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
-                    withSonarQubeEnv('SonarQube') {
+                withSonarQubeEnv('SonarQube') {
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         sh '''
-                            echo "Running SonarQube analysis..."
                             sonar-scanner \
-                                -Dsonar.projectKey=backend-test \
-                                -Dsonar.sources=src \
-                                -Dsonar.tests=src \
-                                -Dsonar.test.inclusions=**/*.spec.ts \
-                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                -Dsonar.exclusions=node_modules/**,dist/** \
-                                -Dsonar.coverage.exclusions=**/*.spec.ts \
-                                -Dsonar.host.url=$SONAR_HOST_URL \
-                                -Dsonar.login=$SONAR_TOKEN
+                            -Dsonar.projectKey=backend-test \
+                            -Dsonar.sources=src \
+                            -Dsonar.tests=src \
+                            -Dsonar.test.inclusions=**/*.spec.ts \
+                            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                            -Dsonar.exclusions=node_modules/**,dist/** \
+                            -Dsonar.coverage.exclusions=**/*.spec.ts \
+                            -Dsonar.host.url=$SONAR_HOST_URL \
+                            -Dsonar.login=$SONAR_TOKEN
                         '''
                     }
                 }
             }
         }
-
 
         stage('Quality Gate') {
             steps {
@@ -75,16 +72,17 @@ pipeline {
         }
 
         stage('Docker Build & Push') {
-            withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
-                sh """
-                    echo 'Logging into Nexus...'
-                    docker login -u $NEXUS_USER -p $NEXUS_PASSWORD host.docker.internal:8081/dockerreponexus
-                    docker build -t host.docker.internal:8081/dockerreponexus/backend-test:latest .
-                    docker push host.docker.internal:8081/dockerreponexus/backend-test:latest
-                """
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')]) {
+                    sh '''
+                        echo "Logging into Nexus..."
+                        docker login -u $NEXUS_USER -p $NEXUS_PASSWORD host.docker.internal:8081/dockerreponexus
+                        docker build -t host.docker.internal:8081/dockerreponexus/${IMAGE_NAME}:$BUILD_TAG .
+                        docker push host.docker.internal:8081/dockerreponexus/${IMAGE_NAME}:$BUILD_TAG
+                    '''
+                }
             }
         }
-
     }
 
     post {
