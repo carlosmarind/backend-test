@@ -16,7 +16,7 @@
     "test": "jest --coverage",
     "test:ci": "jest --coverage",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test:cov": "jest --coverage --reporters=default --reporters=jest-junit",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "sonar": "sonarqube-scanner"
   },
@@ -92,7 +92,7 @@
       [
         "@casualbot/jest-sonar-reporter",
         {
-          "outputDirectory": "coverage",
+          "outputDirectory": ".",
           "outputName": "junit.xml",
           "relativePaths": true
         }

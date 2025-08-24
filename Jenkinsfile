@@ -19,7 +19,6 @@ pipeline {
         stage('Pruebas automatizadas') {
             steps {
                 sh '''
-                    export JEST_JUNIT_OUTPUT_DIR=reports
                     export JEST_JUNIT_OUTPUT_NAME=junit.xml
                     export JEST_JUNIT_SUITE_NAME=backend-test
                     export JEST_JUNIT_SONAR_GENERIC=true
@@ -46,7 +45,7 @@ pipeline {
                                 -Dsonar.tests=src \
                                 -Dsonar.test.inclusions=src/**/*.spec.ts \
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                                -Dsonar.testExecutionReportPaths=reports/junit.xml \
+                                -Dsonar.testExecutionReportPaths=junit.xml \
                                 -Dsonar.login=$SONAR_AUTH_TOKEN \
                                 -Dsonar.host.url=$SONAR_HOST_URL
                             '''
