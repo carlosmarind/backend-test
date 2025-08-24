@@ -1,21 +1,8 @@
 import { bootstrap } from './main';
 
 describe('Main bootstrap', () => {
-  let originalMain: NodeModule;
-
   beforeAll(() => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
-    originalMain = require.main as NodeModule;
-  });
-
-  afterAll(() => {
-    // restauramos la propiedad original
-    delete (require as any).main;
-    Object.defineProperty(require, 'main', {
-      value: originalMain,
-      writable: true,
-      configurable: true,
-    });
   });
 
   it('should execute bootstrap without throwing', async () => {
@@ -32,13 +19,8 @@ describe('Main bootstrap', () => {
   });
 
   it('should cover require.main === module block', async () => {
-    // eliminamos y redefinimos require.main apuntando al módulo actual
-    delete (require as any).main;
-    Object.defineProperty(require, 'main', {
-      value: module,
-      writable: true,
-      configurable: true,
-    });
+    // 🔑 Espiamos require.main para que devuelva `module`
+    jest.spyOn(require as any, 'main', 'get').mockReturnValue(module);
 
     await jest.isolateModulesAsync(async () => {
       const mainModule = require('./main');
