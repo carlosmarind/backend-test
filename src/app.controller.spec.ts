@@ -65,7 +65,7 @@ describe('AppController (e2e)', () => {
     });
 
     it.each([//casos invalidos
-        ['11111111-1', 'Rut invalido 1'],
+        ['11111111-2', 'Rut invalido 1'],
         ['rut invalido', 'Rut invalido 2'],
         ['Felipe Torrico', 'Rut invalido 3'],
         ['', 'Rut invalido 3'],
