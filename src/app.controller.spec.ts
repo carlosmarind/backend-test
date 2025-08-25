@@ -94,12 +94,12 @@ describe('AppController (e2e)', () => {
 
     //BEGIN /operaciones
     it.each([
-        ['suma', '1', 1, 2, 'Prueba suma valida'],
-        ['suma', 1, '1', 2, 'Prueba suma valida'],
         ['suma', 1, 1, 2, 'Prueba suma 1+1 valida'],
         ['suma', 1, -1, 0, 'Prueba suma 1+(-1) valida'],
         ['suma', -1, 1, 0, 'Prueba suma -1+1 valida'],
         ['suma', -1, -1, -2, 'Prueba suma -1+(-1) valida'],
+        ['suma', '1', 1, 2, 'Prueba suma valida'],
+        ['suma', 1, '1', 2, 'Prueba suma valida'],
         ['resta', '1', 1, 0, 'Prueba resta valida'],
         ['resta', 1, '1', 0, 'Prueba resta valida'],
         ['resta', 1, 1, 0, 'Prueba resta 1-1 valida'],
