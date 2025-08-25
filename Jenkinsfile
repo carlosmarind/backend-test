@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         NODE_VERSION = '20'
-        DOCKER_REGISTRY = 'backend-test:Dev'
-        DOCKER_REPO = 'landaura/backend-test'
+        DOCKER_REGISTRY = 'landaura'
+        DOCKER_REPO = 'backend-test'
         SONARQUBE = 'SonarQube'  // nombre configurado en Jenkins para sonar
         KUBECONFIG = '/home/jenkins/.kube/config' // montado en el contenedor Jenkins
     }
@@ -35,16 +35,14 @@ pipeline {
             }
         }
 
-        stage('Construcción de imagen Docker') {
-            steps {
-                script {
-                    sh """
-                        docker build -t ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev .
-                        docker tag ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev ${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}
-                    """
+            stage('Construcción de imagen Docker') {
+                steps {
+                    script {
+                        docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
+                            sh "docker build -t landaura/backend-test:Dev ."
+                        }
+                    }
                 }
-            }
         }
-
     }
 }
