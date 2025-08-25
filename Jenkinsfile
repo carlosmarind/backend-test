@@ -141,35 +141,42 @@ pipeline {
                 -v "$KCONF:/root/.kube/config:ro" \
                 -v "$PWD:/work" -w /work \
                 bitnami/kubectl:latest \
-                kubectl -n "$NS" apply -f kubernetes.yaml
+                -n "$NS" apply -f kubernetes.yaml
 
               # Fuerza actualización a la última imagen
               docker run --rm --network devnet \
                 -v "$KCONF:/root/.kube/config:ro" \
                 bitnami/kubectl:latest \
-                kubectl -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
+                -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
 
               # Espera rollout
               docker run --rm --network devnet \
                 -v "$KCONF:/root/.kube/config:ro" \
                 bitnami/kubectl:latest \
-                kubectl -n "$NS" rollout status deployment/backend-test --timeout=180s
+                -n "$NS" rollout status deployment/backend-test --timeout=180s
 
               # Verificación: disponibles == deseadas
-              DR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" bitnami/kubectl:latest kubectl -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-              AR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" bitnami/kubectl:latest kubectl -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+              DR=$(docker run --rm --network devnet \
+                  -v "$KCONF:/root/.kube/config:ro" \
+                  bitnami/kubectl:latest \
+                  -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+              AR=$(docker run --rm --network devnet \
+                  -v "$KCONF:/root/.kube/config:ro" \
+                  bitnami/kubectl:latest \
+                  -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
               echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
               test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
               docker run --rm --network devnet \
                 -v "$KCONF:/root/.kube/config:ro" \
                 bitnami/kubectl:latest \
-                kubectl -n "$NS" get pods -l app=backend-test -o wide
+                -n "$NS" get pods -l app=backend-test -o wide
             '''
           }
         }
       }
     }
+
   }
 
   post {
