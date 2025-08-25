@@ -1,5 +1,6 @@
 pipeline {
   agent any
+  tools { nodejs 'nodejs-20' }
   options { timestamps(); skipDefaultCheckout(true) }
 
   environment {
@@ -16,12 +17,11 @@ pipeline {
     }
 
     stage('Install & Test') {
-      tools { nodejs 'nodejs-18' }
       steps {
         powershell '''
           $ErrorActionPreference = "Stop"
           npm ci
-          npm test -- --coverage
+          npx jest --config=jest.config.js --coverage --runInBand
           if (!(Test-Path coverage/lcov.info)) { Write-Error "Falta coverage/lcov.info"; exit 1 }
           Write-Host "Primeras rutas del LCOV:"
           Select-String -Path coverage/lcov.info -Pattern "^SF:" | Select-Object -First 5
@@ -42,7 +42,8 @@ pipeline {
               -D"sonar.sources=src" `
               -D"sonar.tests=src" `
               -D"sonar.test.inclusions=**/*.spec.ts,**/*.test.ts" `
-              -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info"
+              -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" `
+              -D"sonar.typescript.lcov.reportPaths=coverage/lcov.info"
           '''
         }
       }
