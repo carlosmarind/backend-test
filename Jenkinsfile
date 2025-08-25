@@ -135,62 +135,68 @@ stage('Deploy to Kubernetes') {
           DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
           [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # --- kubeconfig: limpiar y normalizar a archivo ---
-          # si quedó una CARPETA con ese nombre por intentos previos, elimínala
-          [ -d "$WORKSPACE/kubeconfig.yaml" ] && rm -rf "$WORKSPACE/kubeconfig.yaml"
-          rm -f "$WORKSPACE/kubeconfig.yaml" || true
-
-          SRC="$KUBECONFIG_FILE"
-          if [ -d "$SRC" ]; then
-            # credencial entregada como directorio: elegir archivo válido
-            if   [ -f "$SRC/config" ]; then SRC="$SRC/config"
-            elif [ -f "$SRC/kubeconfig" ]; then SRC="$SRC/kubeconfig"
-            else
-              SRC="$(find "$KUBECONFIG_FILE" -maxdepth 1 -type f \\( -name '*.yml' -o -name '*.yaml' -o -name 'config' -o -name 'kubeconfig' \\) | head -n1 || true)"
-            fi
-          fi
-          [ -f "$SRC" ] || { echo "No se halló archivo kubeconfig dentro de la credencial"; exit 2; }
-
-          cp -f "$SRC" "$WORKSPACE/kubeconfig.yaml"
+          # --- kubeconfig: ya es un ARCHIVO (Secret file) ---
+          cp -f "$KUBECONFIG_FILE" "$WORKSPACE/kubeconfig.yaml"
           chmod 600 "$WORKSPACE/kubeconfig.yaml"
-          echo "server en kubeconfig: $(awk \'/server:/ {print $2; exit}\' "$WORKSPACE/kubeconfig.yaml" || true)"
 
-          # alias para kubectl (montamos workspace RW y fijamos kubeconfig explícito)
+          # Verificar que el archivo existe y tiene contenido
+          [ -s "$WORKSPACE/kubeconfig.yaml" ] || { echo "kubeconfig.yaml está vacío o no existe"; exit 2; }
+          echo "=== Primeras líneas del kubeconfig ==="
+          head -n 5 "$WORKSPACE/kubeconfig.yaml"
+
+          # --- alias para kubectl ---
           KUB="docker run --rm --user=0:0 \
-               -e HOME=/root -e KUBECONFIG=/work/kubeconfig.yaml \
-               -v $WORKSPACE:/work:rw \
-               bitnami/kubectl:1.30-debian-12 \
+               -v $WORKSPACE:/work:ro \
+               bitnami/kubectl:latest \
                --kubeconfig=/work/kubeconfig.yaml"
 
-          # --- imagePullSecret: generar YAML en HOST y aplicar desde archivo ---
+          # --- Verificar conexión a Kubernetes ---
+          echo "=== Verificando versión de kubectl ==="
+          $KUB version --client
+          
+          echo "=== Verificando conexión al cluster ==="
+          $KUB cluster-info
+
+          # --- Crear/actualizar imagePullSecret ---
           REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
+          echo "=== Creando secret de Docker registry ==="
           $KUB -n "$NS" create secret docker-registry nexus-docker \
             --docker-server="$REG_SERVER" \
             --docker-username="$REG_USER" \
             --docker-password="$REG_PASS" \
             --docker-email="noreply@local" \
-            --dry-run=client -o yaml > "$WORKSPACE/.dockersecret.yaml"
+            --dry-run=client -o yaml | $KUB -n "$NS" apply -f -
 
-          [ -s "$WORKSPACE/.dockersecret.yaml" ] || { echo "Secret YAML vacío"; exit 2; }
+          # --- Aplicar manifiesto de la aplicación ---
+          echo "=== Aplicando manifiesto: $DF ==="
+          $KUB -n "$NS" apply -f /work/"$DF"
 
-          $KUB -n "$NS" apply --validate=false -f /work/.dockersecret.yaml
-
-          # --- manifiesto de la app ---
-          echo "==> Aplicando manifiesto: $DF"
-          $KUB -n "$NS" apply --validate=false -f /work/"$DF"
-
-          # --- set image y rollout ---
-          echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
+          # --- Actualizar la imagen del deployment ---
+          echo "=== Actualizando imagen a ${IMAGE_NAME}:${BUILD_NUMBER} ==="
           $KUB -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
+          # --- Esperar por el rollout ---
+          echo "=== Esperando por el rollout ==="
           $KUB -n "$NS" rollout status deployment/backend-test --timeout=180s
 
+          # --- Verificar estado final ---
+          echo "=== Estado final del deployment ==="
+          $KUB -n "$NS" get deployment backend-test -o wide
+          
+          echo "=== Pods en ejecución ==="
+          $KUB -n "$NS" get pods -l app=backend-test -o wide
+
+          # --- Verificación adicional ---
           DR=$($KUB -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
           AR=$($KUB -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
           echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
-          test -n "$DR" && [ "${AR:-0}" = "$DR" ]
-
-          $KUB -n "$NS" get pods -l app=backend-test -o wide
+          
+          if [ -n "$DR" ] && [ "${AR:-0}" -eq "$DR" ]; then
+            echo "✅ Despliegue exitoso - Todas las réplicas están disponibles"
+          else
+            echo "❌ Problema con el despliegue - Réplicas disponibles: ${AR:-0}/$DR"
+            exit 1
+          fi
         '''
       }
     }
