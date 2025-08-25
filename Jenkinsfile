@@ -69,14 +69,19 @@ pipeline {
                 }
             }
         }
-        stage('Construcción de imagen docker & Upload de imagen') {
+        stage('Despliegue continuo') {
+            when {
+                branch 'main'
+            }
+            agent{
+                docker{
+                    image 'alpine/k8s:1.32.2'
+                    reuseNode true
+                }
+            }
             steps {
-                sh 'docker build -t backend-node-devops:cmd .'
-                sh "docker tag backend-node-devops:cmd localhost:8082/backend-node-devops:${BUILD_NUMBER}"
-                script {
-                    docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
-                        sh "docker push localhost:8082/backend-node-devops:${BUILD_NUMBER}"
-                    }
+                withKubeConfig([credentialsId: 'kubeconfig-docker']){
+                     sh "kubectl -n devops set image deployments backend-node-devops backend-node-devops=localhost:8082/backend-node-devops:${BUILD_NUMBER}"
                 }
             }
         }                
