@@ -129,54 +129,40 @@ pipeline {
     stage('Deploy to Kubernetes') {
       steps {
         script {
-          withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
-            sh '''
-              set -eux
-              NS="${K8S_NAMESPACE}"
-              KCONF="$KUBECONFIG_FILE"
+          // Imagen con shell (trae /bin/sh y cat)
+          docker.image('bitnami/kubectl:1.30-debian-12').inside('--network devnet') {
+            withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
+              sh '''
+                set -eux
+                export KUBECONFIG="$KUBECONFIG_FILE"
+                NS="${K8S_NAMESPACE}"
+                DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
 
-              DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
-              if [ ! -f "$DF" ]; then
-                echo "Deployment file '$DF' no encontrado. Buscando candidatos..."
-                for c in kubernetes.yaml k8s/kubernetes.yaml kubernetes/kubernetes.yaml k8s/deployment.yaml deployment.yaml; do
-                  if [ -f "$c" ]; then DF="$c"; break; fi
-                done
-              fi
-              [ -f "$DF" ] || { echo "No se encontró manifiesto K8s en el workspace."; ls -la; exit 2; }
+                [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-              echo "Usando manifiesto: $DF"
-              echo "Workspace: $WORKSPACE"; ls -la
+                # Aplica manifiesto desde el workspace (ahora sí visible dentro del contenedor)
+                kubectl -n "$NS" apply -f "$DF"
 
-              docker run --rm --network devnet \
-                -v "$KCONF:/root/.kube/config:ro" \
-                -v "$WORKSPACE:/work" -w /work \
-                bitnami/kubectl:latest \
-                -n "$NS" apply -f "$DF"
+                # Actualiza la imagen
+                kubectl -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
 
-              docker run --rm --network devnet \
-                -v "$KCONF:/root/.kube/config:ro" \
-                bitnami/kubectl:latest \
-                -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
+                # Espera rollout
+                kubectl -n "$NS" rollout status deployment/backend-test --timeout=180s
 
-              docker run --rm --network devnet \
-                -v "$KCONF:/root/.kube/config:ro" \
-                bitnami/kubectl:latest \
-                -n "$NS" rollout status deployment/backend-test --timeout=180s
+                # Verificación: disponibles == deseadas
+                DR=$(kubectl -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+                AR=$(kubectl -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+                echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
+                test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-              DR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-              AR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
-              echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
-              test -n "$DR" && [ "${AR:-0}" = "$DR" ]
-
-              docker run --rm --network devnet \
-                -v "$KCONF:/root/.kube/config:ro" \
-                bitnami/kubectl:latest \
-                -n "$NS" get pods -l app=backend-test -o wide
-            '''
+                kubectl -n "$NS" get pods -l app=backend-test -o wide
+              '''
+            }
           }
         }
       }
     }
+
 
 
   }
