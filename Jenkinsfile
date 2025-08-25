@@ -133,81 +133,88 @@ pipeline {
       }
     }
 
-  stage('Deploy to Kubernetes') {
-  steps {
-    script {
-      withCredentials([
-        file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
-        usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
-      ]) {
-        sh '''
-          set -eux
-          NS="${K8S_NAMESPACE}"
-          DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
-          [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
+    stage('Deploy to Kubernetes') {
+      steps {
+        script {
+          withCredentials([
+            file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
+            usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
+          ]) {
+            sh '''
+              set -eux
+              NS="${K8S_NAMESPACE}"
+              DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
+              [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # 1) Preparar ~/.kube/config como DIRECTORIO
-          mkdir -p "$PWD/.kube"
-          SRC="$KUBECONFIG_FILE"
-          if [ -f "$SRC" ]; then
-            cp "$SRC" "$PWD/.kube/config"
-          elif [ -d "$SRC" ] && [ -f "$SRC/config" ]; then
-            cp "$SRC/config" "$PWD/.kube/config"
-          else
-            echo "Credencial kubeconfig inválida (no es archivo ni directorio con 'config')"; exit 2
-          fi
-          chmod 600 "$PWD/.kube/config"
-          awk '/server:/ {print "Kubeconfig server:", $2; exit}' "$PWD/.kube/config" || true
+              # 1) Preparar carpeta .kube con archivo 'config'
+              mkdir -p "$PWD/.kube"
+              SRC="$KUBECONFIG_FILE"
+              if [ -f "$SRC" ]; then
+                cp "$SRC" "$PWD/.kube/config"
+              elif [ -d "$SRC" ] && [ -f "$SRC/config" ]; then
+                cp "$SRC/config" "$PWD/.kube/config"
+              else
+                echo "Credencial kubeconfig inválida (no es archivo ni directorio con 'config')"; exit 2
+              fi
+              chmod 600 "$PWD/.kube/config"
+              awk '/server:/ {print "Kubeconfig server:", $2; exit}' "$PWD/.kube/config" || true
 
-          # 2) Obtener el primer contexto si no hay current-context
-          CONTEXT="$(awk \'
-            /^contexts:/ {p=1; next}
-            p && /name:/ {print $2; exit}
-          \' "$PWD/.kube/config" || true)"
+              # Montaje y variables de entorno para que kubectl SIEMPRE lea /root/.kube/config
+              KMOUNT="-v $PWD/.kube:/root/.kube:ro"
+              KENV="-e HOME=/root -e KUBECONFIG=/root/.kube/config"
 
-          KOPTS=""
-          if [ -n "$CONTEXT" ]; then
-            echo "Usando contexto: $CONTEXT"
-            KOPTS="--context=$CONTEXT"
-          else
-            echo "ADVERTENCIA: no se pudo determinar un contexto; si aparece error de contexto, revisa tu kubeconfig."
-          fi
+              # (Opcional) Detectar primer contexto del archivo
+              CONTEXT="$(awk '
+                /^contexts:/ {p=1; next}
+                p && /name:/ {print $2; exit}
+              ' "$PWD/.kube/config" || true)"
 
-          # Montaje de la carpeta .kube al home del contenedor
-          KMOUNT="-v $PWD/.kube:/root/.kube:ro"
+              KOPTS=""
+              if [ -n "$CONTEXT" ]; then
+                # Verificar que kubectl vea ese contexto (ya con HOME/KUBECONFIG forzados)
+                LIST=$(docker run --rm $KMOUNT $KENV bitnami/kubectl:latest config get-contexts -o name || true)
+                if echo "$LIST" | grep -qx "$CONTEXT"; then
+                  echo "Usando contexto: $CONTEXT"
+                  KOPTS="--context=$CONTEXT"
+                else
+                  echo "Aviso: el contexto '$CONTEXT' no aparece en kubectl; se continuará sin --context"
+                fi
+              fi
 
-          # 3) Crear/actualizar imagePullSecret para Nexus
-          docker run --rm $KMOUNT bitnami/kubectl:latest $KOPTS -n "$NS" create secret docker-registry nexus-docker \
-            --docker-server=${NEXUS_REGISTRY} \
-            --docker-username="$REG_USER" \
-            --docker-password="$REG_PASS" \
-            --docker-email="noreply@local" \
-            --dry-run=client -o yaml | \
-          docker run --rm -i $KMOUNT bitnami/kubectl:latest $KOPTS -n "$NS" apply -f -
+              # 2) Crear/actualizar imagePullSecret para Nexus
+              docker run --rm $KMOUNT $KENV bitnami/kubectl:latest $KOPTS -n "$NS" create secret docker-registry nexus-docker \
+                --docker-server=${NEXUS_REGISTRY} \
+                --docker-username="$REG_USER" \
+                --docker-password="$REG_PASS" \
+                --docker-email="noreply@local" \
+                --dry-run=client -o yaml | \
+              docker run --rm -i $KMOUNT $KENV bitnami/kubectl:latest $KOPTS -n "$NS" apply -f -
 
-          # 4) Aplicar manifiesto
-          docker run --rm $KMOUNT -v "$PWD:/work" -w /work \
-            bitnami/kubectl:latest $KOPTS -n "$NS" apply -f "$DF"
+              # 3) Aplicar manifiesto
+              docker run --rm $KMOUNT $KENV -v "$PWD:/work" -w /work \
+                bitnami/kubectl:latest $KOPTS -n "$NS" apply -f "$DF"
 
-          # 5) Forzar imagen EXACTA del build
-          docker run --rm $KMOUNT \
-            bitnami/kubectl:latest $KOPTS -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
+              # 4) Actualizar imagen al build actual
+              docker run --rm $KMOUNT $KENV \
+                bitnami/kubectl:latest $KOPTS -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
-          # 6) Esperar rollout y verificar
-          docker run --rm $KMOUNT \
-            bitnami/kubectl:latest $KOPTS -n "$NS" rollout status deployment/backend-test --timeout=180s
+              # 5) Esperar rollout y verificar
+              docker run --rm $KMOUNT $KENV \
+                bitnami/kubectl:latest $KOPTS -n "$NS" rollout status deployment/backend-test --timeout=180s
 
-          DR=$(docker run --rm $KMOUNT bitnami/kubectl:latest $KOPTS -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-          AR=$(docker run --rm $KMOUNT bitnami/kubectl:latest $KOPTS -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
-          echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
-          test -n "$DR" && [ "${AR:-0}" = "$DR" ]
+              DR=$(docker run --rm $KMOUNT $KENV bitnami/kubectl:latest $KOPTS -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+              AR=$(docker run --rm $KMOUNT $KENV bitnami/kubectl:latest $KOPTS -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+              echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
+              test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-          docker run --rm $KMOUNT \
-            bitnami/kubectl:latest $KOPTS -n "$NS" get pods -l app=backend-test -o wide
-        '''
+              docker run --rm $KMOUNT $KENV \
+                bitnami/kubectl:latest $KOPTS -n "$NS" get pods -l app=backend-test -o wide
+            '''
+          }
+        }
       }
     }
-  }
+
 
 
 }
