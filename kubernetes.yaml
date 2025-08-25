@@ -3,6 +3,15 @@ kind: Namespace
 metadata:
   name: devops
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-node-devops
+  namespace: devops
+data:
+  USERNAME: "jorge-cabrera"
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,11 +34,18 @@ spec:
         image: localhost:8082/backend-node-devops:latest
         imagePullPolicy: Always
         env:
-        - name: NODE_ENV
-          value: development
-        - name: PORT_SECUNDARIO
+        - name: PORT
           value: "3000"
-
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-secret   
+              key: API_KEY 
+        - name: USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config     
+              key: USERNAME 
 ---
 apiVersion: v1
 kind: Service
