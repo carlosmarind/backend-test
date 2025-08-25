@@ -161,5 +161,6 @@ describe('AppController (e2e)', () => {
                 expect(res.body.resultado).toBeNull();
                 expect(res.body.mensaje).toBe('operacion no pudo ser calculada');
             });
+    });
     //END /operaciones
 });
