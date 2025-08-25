@@ -51,10 +51,10 @@ describe('AppController (e2e)', () => {
 
     //BEGIN /validate-rut
     it.each([//casos correctos
-        ['123456789-9', 'Rut valido num1'],
-        ['11111111-1', 'Rut valido num2'],
-        ['3473829-k', 'Rut valido k1'],
-        ['8492374-K', 'Rut valido K1']
+        ['3257762-8', 'Rut valido num1'],
+        ['4382417-1', 'Rut valido num2'],
+        ['4808186-k', 'Rut valido k1'],
+        ['8072232-K', 'Rut valido K1']
     ])('Deberia retornar 200 porque es un rut valido: %s (%s)', async (rut, descripcion) => {
         return request(app.getHttpServer())
             .get(`/validate-rut?rut=${rut}`)
@@ -65,8 +65,9 @@ describe('AppController (e2e)', () => {
     });
 
     it.each([//casos invalidos
-        ['rut invalido', 'Rut invalido 1'],
-        ['Felipe Torrico', 'Rut invalido 2'],
+        ['11111111-1', 'Rut invalido 1'],
+        ['rut invalido', 'Rut invalido 2'],
+        ['Felipe Torrico', 'Rut invalido 3'],
         ['', 'Rut invalido 3'],
         ['-4', 'Rut invalido 4']
     ])('Deberia retornar 400 porque es un rut invalido: %s (%s)', async (rut, descripcion) => {
@@ -132,7 +133,6 @@ describe('AppController (e2e)', () => {
         ['suma', 1, 'a', NaN, 'Prueba suma invalida'],
         ['suma', 'a', 'b', NaN, 'Prueba suma invalida'],
         ['resta', 1, 'a', NaN, 'Prueba resta invalida'],
-        ['resta', '1', 1, NaN, 'Prueba resta invalida'],
         ['resta', 'a', 'b', NaN, 'Prueba resta invalida'],
         ['multiplicacion', 'a', 2, NaN, 'Prueba multiplicacion invalida a es letra'],
         ['multiplicacion', 2, 'a', NaN, 'Prueba multiplicacion invalida b es letra'],
@@ -146,7 +146,7 @@ describe('AppController (e2e)', () => {
             .get(`/operaciones?operacion=${operacion}&a=${a}&b=${b}`)
             .expect(502)
             .expect((res) => {
-                expect(res.body.resultado).toBe(expectedResult);
+                expect(res.body.resultado).toBeNull();
                 expect(res.body.mensaje).toBe('operacion no pudo ser calculada');
             });
     });
