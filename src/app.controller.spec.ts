@@ -81,8 +81,8 @@ describe('AppController (e2e)', () => {
     //END /validate-rut
 
     //BEGIN /apikey
-    it('Siempre retorna 200. Apikey con !!', () => {
-        return request(app.getHttpServer())
+    it('Siempre retorna 200. Apikey con !!', async () => {
+        return await request(app.getHttpServer())
         .get(`/apikey`)
         .expect(200)
         .expect((res) => {
@@ -153,7 +153,7 @@ describe('AppController (e2e)', () => {
             });
     });
 
-    it('Prueba operacion vacia', async (operacion, a, b, expectedResult, descripcion) => {
+    it('Prueba operacion vacia', async () => {
         return await request(app.getHttpServer())
             .get(`/operaciones?a=1&b=1`)
             .expect(502)
