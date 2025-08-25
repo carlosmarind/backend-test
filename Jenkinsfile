@@ -29,6 +29,7 @@ pipeline {
           & "$env:SCANNER_HOME\\bin\\sonar-scanner.bat" `
             -D"sonar.projectKey=backend-test" `
             -D"sonar.projectName=backend-test" `
+            -D"sonar.projectVersion=%BUILD_NUMBER%" `
             -D"sonar.sourceEncoding=UTF-8" `
             -D"sonar.sources=src" `
             -D"sonar.tests=src" `
@@ -36,6 +37,7 @@ pipeline {
             -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" `
             -D"sonar.typescript.lcov.reportPaths=coverage/lcov.info"
         '''
+
       }
     }
   }
