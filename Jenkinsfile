@@ -120,14 +120,12 @@ pipeline {
         }
       }
     }
-
 stage('Deploy to Kubernetes') {
   steps {
     script {
       withCredentials([
         file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
-        usernamePassword(credentialsId: 'nexus-credentials',
-          usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
+        usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
       ]) {
         sh '''
           set -eux
@@ -136,54 +134,57 @@ stage('Deploy to Kubernetes') {
           DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
           [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # Limpieza para evitar colisiones previas (carpeta 'kubeconfig' etc.)
-          rm -rf "$WORKSPACE/kubeconfig" "$WORKSPACE/.kube" || true
-          rm -f  "$WORKSPACE/kubeconfig.yaml" || true
-
-          # Copiamos SIEMPRE a un archivo con nombre fijo
+          # --- KUBECONFIG: SIEMPRE archivo, y lo montamos como /work/kubeconfig.yaml ---
+          rm -f "$WORKSPACE/kubeconfig.yaml" || true
           cp "$KUBECONFIG_FILE" "$WORKSPACE/kubeconfig.yaml"
           chmod 600 "$WORKSPACE/kubeconfig.yaml"
+          [ -s "$WORKSPACE/kubeconfig.yaml" ] || { echo "kubeconfig vacío"; exit 2; }
 
-          # kubectl en contenedor SIEMPRE con --kubeconfig al archivo montado
-          KCA="docker run --rm -i --user=0:0 \
-               -v $WORKSPACE/kubeconfig.yaml:/kube/config:ro \
-               bitnami/kubectl:latest \
-               --kubeconfig=/kube/config"
+          echo ">> kubeconfig (primeras líneas):"
+          head -n 5 "$WORKSPACE/kubeconfig.yaml" || true
 
-          # (opcional) contexto actual por si quieres fijarlo
-          CTX="$($KCA config view -o jsonpath='{.current-context}' || true)"
-          [ -n "$CTX" ] && KCTX="--context=$CTX" || KCTX=""
+          # Atajos para kubectl dentro del contenedor
+          KMNT="-v $WORKSPACE:/work:ro"
+          KCFG="--kubeconfig=/work/kubeconfig.yaml"
+          KUB="docker run --rm --user=0:0 $KMNT bitnami/kubectl:latest $KCFG"
 
-          # 1) imagePullSecret -> por STDIN, sin archivos intermedios
+          # Preflight (detecta problemas reales del cluster ¡antes! de aplicar)
+          $KUB version --short || true
+          $KUB cluster-info
+
+          # --- imagePullSecret: generar YAML en el HOST y luego aplicar (sin pipes entre contenedores) ---
           REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
           echo "Usando registry para imagePullSecret: $REG_SERVER"
 
-          $KCA $KCTX -n "$NS" create secret docker-registry nexus-docker \
+          # Genera el YAML del secret en el workspace del host
+          docker run --rm --user=0:0 $KMNT bitnami/kubectl:latest $KCFG -n "$NS" create secret docker-registry nexus-docker \
             --docker-server="$REG_SERVER" \
             --docker-username="$REG_USER" \
             --docker-password="$REG_PASS" \
             --docker-email="noreply@local" \
-            --dry-run=client -o yaml \
-          | $KCA $KCTX -n "$NS" apply --validate=false -f -
+            --dry-run=client -o yaml > "$WORKSPACE/.dockersecret.yaml"
 
-          # 2) Aplicar manifiesto de la app por STDIN
+          ls -l "$WORKSPACE/.dockersecret.yaml"
+          head -n 3 "$WORKSPACE/.dockersecret.yaml" || true
+
+          # Aplica el secret y el manifiesto (siempre con --kubeconfig correcto)
+          $KUB -n "$NS" apply --validate=false -f /work/.dockersecret.yaml
           echo "==> Aplicando manifiesto: $DF"
-          cat "$DF" | $KCA $KCTX -n "$NS" apply --validate=false -f -
+          $KUB -n "$NS" apply --validate=false -f /work/"$DF"
 
-          # 3) Forzar imagen exacta del build
+          # Forzar la imagen exacta construida
           echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
-          $KCA $KCTX -n "$NS" set image deployment/backend-test \
-            backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
+          $KUB -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
-          # 4) Esperar rollout y validar réplicas
-          $KCA $KCTX -n "$NS" rollout status deployment/backend-test --timeout=180s
-          DR=$($KCA $KCTX -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-          AR=$($KCA $KCTX -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+          # Rollout y validación de réplicas
+          $KUB -n "$NS" rollout status deployment/backend-test --timeout=180s
+          DR=$($KUB -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+          AR=$($KUB -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
           echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
           test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-          # 5) Diagnóstico final
-          $KCA $KCTX -n "$NS" get pods -l app=backend-test -o wide
+          # Diagnóstico final
+          $KUB -n "$NS" get pods -l app=backend-test -o wide
         '''
       }
     }
