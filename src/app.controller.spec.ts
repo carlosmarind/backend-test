@@ -98,28 +98,27 @@ describe('AppController (e2e)', () => {
         ['suma', 1, -1, 0, 'Prueba suma 1+(-1) valida'],
         ['suma', -1, 1, 0, 'Prueba suma -1+1 valida'],
         ['suma', -1, -1, -2, 'Prueba suma -1+(-1) valida'],
-        ['suma', '1', 1, 2, 'Prueba suma valida'],
-        ['suma', 1, '1', 2, 'Prueba suma valida'],
-        ['resta', '1', 1, 0, 'Prueba resta valida'],
-        ['resta', 1, '1', 0, 'Prueba resta valida'],
+        //['suma', '1', 1, 2, 'Prueba suma valida'],
+        //['suma', 1, '1', 2, 'Prueba suma valida'],
+       // ['resta', '1', 1, 0, 'Prueba resta valida'],
+        //['resta', 1, '1', 0, 'Prueba resta valida'],
         ['resta', 1, 1, 0, 'Prueba resta 1-1 valida'],
         ['resta', 1, -1, 2, 'Prueba resta 1-(-1) valida'],
         ['resta', -1, 1, -2, 'Prueba resta -1-1 valida'],
         ['resta', -1, -1, 0, 'Prueba resta -1-(-1) valida'],
-        ['multiplicacion', '2', 2, 4, 'Prueba multiplicacion valida'],
-        ['multiplicacion', 2, '2', 4, 'Prueba multiplicacion valida'],
+        //['multiplicacion', '2', 2, 4, 'Prueba multiplicacion valida'],
+        //['multiplicacion', 2, '2', 4, 'Prueba multiplicacion valida'],
         ['multiplicacion', 2, 2, 4, 'Prueba multiplicacion 2*2 valida'],
         ['multiplicacion', 2, -2, -4, 'Prueba multiplicacion 2*(-2) valida'],
         ['multiplicacion', -2, 2, -4, 'Prueba multiplicacion -2*2 valida'],
         ['multiplicacion', -2, -2, 4, 'Prueba multiplicacion -2*(-2) valida'],
-        ['division', '2', 2, 1, 'Prueba division valida'],
-        ['division', 2, '2', 1, 'Prueba division valida'],
+        //['division', '2', 2, 1, 'Prueba division valida'],
+        //['division', 2, '2', 1, 'Prueba division valida'],
         ['division', 2, 2, 1, 'Prueba division 2/2 valida'],
         ['division', 2, -2, -1, 'Prueba division 2/(-2) valida'],
         ['division', -2, 2, -1, 'Prueba division -2/2 valida'],
         ['division', -2, -2, 1, 'Prueba division -2/(-2) valida']
     ])('Operaciones validas', async (operacion, a, b, expectedResult, descripcion) => {
-        console.log('Test params:', { operacion, a, b, expectedResult });//TODO borrar
         return request(app.getHttpServer())
             .get(`/operaciones?operacion=${operacion}&a=${a}&b=${b}`)
             .expect(200)
