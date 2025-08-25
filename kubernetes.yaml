@@ -1,0 +1,63 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  USERNAME: "alexis"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+type: Opaque
+data:
+
+  API_KEY: "cmVwbGFjZS13aXRoLXlvdXItYXBpLWtleQ=="
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-test
+  labels:
+    app: backend-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-test
+  template:
+    metadata:
+      labels:
+        app: backend-test
+    spec:
+      containers:
+      - name: backend-test
+        image: host.docker.internal:8083/backend-test:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: app-secret
+      imagePullSecrets:
+      - name: nexus-docker-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-test
+  labels:
+    app: backend-test
+spec:
+  selector:
+    app: backend-test
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+  type: ClusterIP
