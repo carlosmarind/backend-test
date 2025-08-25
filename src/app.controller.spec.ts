@@ -141,7 +141,8 @@ describe('AppController (e2e)', () => {
         ['division', 'a', 2, NaN, 'Prueba division invalida a es letra'],
         ['division', 2, 'a', NaN, 'Prueba division invalida b es letra'],
         ['division', 'a', 'b', NaN, 'Prueba division invalida sin numeros'],
-        ['division', 2, 0, NaN, 'Prueba division invalida division por 0']
+        ['division', 2, 0, NaN, 'Prueba division invalida division por 0'],
+        ['division', 0, 5, NaN, '0 dividido por 5 da 0 pero el controller lo trata como error'],
     ])('Operaciones invalidas', async (operacion, a, b, expectedResult, descripcion) => {
         return await request(app.getHttpServer())
             .get(`/operaciones?operacion=${operacion}&a=${a}&b=${b}`)
@@ -151,5 +152,14 @@ describe('AppController (e2e)', () => {
                 expect(res.body.mensaje).toBe('operacion no pudo ser calculada');
             });
     });
+
+    it('Prueba operacion vacia', async (operacion, a, b, expectedResult, descripcion) => {
+        return await request(app.getHttpServer())
+            .get(`/operaciones?a=1&b=1`)
+            .expect(502)
+            .expect((res) => {
+                expect(res.body.resultado).toBeNull();
+                expect(res.body.mensaje).toBe('operacion no pudo ser calculada');
+            });
     //END /operaciones
 });
