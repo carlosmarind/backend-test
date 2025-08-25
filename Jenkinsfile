@@ -61,9 +61,9 @@ pipeline {
           docker.image(env.IMAGE_TOOLING).inside('-v /var/run/docker.sock:/var/run/docker.sock --network devnet') {
             withSonarQubeEnv(SONARQUBE_SERVER) {
               withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
-                sh """
+                sh '''
                   sonar-scanner \
-                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                    -Dsonar.projectKey='"${SONAR_PROJECT_KEY}"' \
                     -Dsonar.sources=src \
                     -Dsonar.tests=src \
                     -Dsonar.test.inclusions=**/*.spec.ts \
@@ -71,8 +71,9 @@ pipeline {
                     -Dsonar.exclusions=node_modules/**,dist/** \
                     -Dsonar.coverage.exclusions=**/*.spec.ts \
                     -Dsonar.host.url=http://sonarqube:9000 \
-                    -Dsonar.login=$SONAR_TOKEN
-                """
+                    -Dsonar.login="$SONAR_TOKEN"
+                '''
+
               }
             }
           }
@@ -97,7 +98,7 @@ pipeline {
           docker.image(env.IMAGE_TOOLING).inside('-v /var/run/docker.sock:/var/run/docker.sock --network devnet') {
             withCredentials([usernamePassword(credentialsId: 'nexus-credentials',
               usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-              sh """
+              sh '''
                 set -eux
                 echo "$NEXUS_PASS" | docker login -u "$NEXUS_USER" --password-stdin http://${NEXUS_REGISTRY}
 
@@ -106,7 +107,7 @@ pipeline {
                 docker push ${IMAGE_NAME}:latest
 
                 docker image prune -f
-              """
+              '''
             }
           }
         }
@@ -122,64 +123,62 @@ pipeline {
               file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
               string(credentialsId: 'api-key',    variable: 'API_KEY')
             ]) {
-              sh """
-                set -eu
-                export KUBECONFIG="$KUBECONFIG_FILE"
-                NS="${K8S_NAMESPACE}"
+            sh '''
+              set -eu
+              export KUBECONFIG="$KUBECONFIG_FILE"
+              NS="${K8S_NAMESPACE}"
 
-                # === Opción C: crear/actualizar ConfigMap y Secret sin exponer secretos en Git ===
-                kubectl -n "$NS" create configmap app-config \
-                  --from-literal=USERNAME=userkube \
-                  --dry-run=client -o yaml | kubectl apply -f -
+              kubectl -n "$NS" create configmap app-config \
+                --from-literal=USERNAME=userkube \
+                --dry-run=client -o yaml | kubectl apply -f -
 
-                kubectl -n "$NS" create secret generic app-secrets \
-                  --from-literal=API_KEY="$API_KEY" \
-                  --dry-run=client -o yaml | kubectl apply -f -
-
-                # (Opcional) si el clúster necesita autenticarse para hacer pull del registry:
-                # with nexus-credentials -> crea/actualiza imagePullSecret "nexus-docker"
-              """
+              kubectl -n "$NS" create secret generic app-secrets \
+                --from-literal=API_KEY="$API_KEY" \
+                --dry-run=client -o yaml | kubectl apply -f -
+            '''
             }
 
             // (Opcional) crea/actualiza imagePullSecret usando credenciales de Nexus
             withCredentials([usernamePassword(credentialsId: 'nexus-credentials',
               usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
-              sh """
+              sh '''
                 set -eu
                 export KUBECONFIG="$KUBECONFIG_FILE"
                 NS="${K8S_NAMESPACE}"
 
                 # Descomenta si tu cluster necesita auth para pull
-                # kubectl -n "$NS" create secret docker-registry nexus-docker \\
-                #   --docker-server=${NEXUS_REGISTRY} \\
-                #   --docker-username="$REG_USER" \\
-                #   --docker-password="$REG_PASS" \\
-                #   --docker-email="noreply@local" \\
+                # kubectl -n "$NS" create secret docker-registry nexus-docker \
+                #   --docker-server='${NEXUS_REGISTRY}' \
+                #   --docker-username="$REG_USER" \
+                #   --docker-password="$REG_PASS" \
+                #   --docker-email="noreply@local" \
                 #   --dry-run=client -o yaml | kubectl apply -f -
-              """
+              '''
             }
 
             // Aplica manifiestos y actualiza imagen
             withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
-              sh """
+              sh '''
                 set -eu
                 export KUBECONFIG="$KUBECONFIG_FILE"
                 NS="${K8S_NAMESPACE}"
 
                 kubectl -n "$NS" apply -f kubernetes.yaml
 
-                # Fuerza actualización a la última imagen (tag latest)
+                # Fuerza actualización a la última imagen
                 kubectl -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
 
-                # Espera rollout OK (3 réplicas disponibles)
+                # Espera el rollout
                 kubectl -n "$NS" rollout status deployment/backend-test --timeout=180s
 
-                # Verificación estricta: deben haber 3 réplicas disponibles
+                # Verificación estricta: 3 réplicas disponibles
                 AR=$(kubectl -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
-                test "$AR" = "3"
+                echo "Available replicas: ${AR:-0}"
+                test "${AR:-0}" = "3"
 
                 kubectl -n "$NS" get pods -l app=backend-test -o wide
-              """
+              '''
+
             }
           }
         }
