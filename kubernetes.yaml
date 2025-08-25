@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-node-devops
+  namespace: devops
+data:
+  USERNAME: "jorge-cabrera"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-node-devops
+  namespace: devops
+  labels:
+    app: backend-node-devops
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-node-devops
+  template:
+    metadata:
+      labels:
+        app: backend-node-devops
+    spec:
+      containers:
+      - name: backend-node-devops
+        image: localhost:8082/backend-node-devops:latest
+        imagePullPolicy: Always
+        env:
+        - name: PORT
+          value: "3000"
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-secret   
+              key: API_KEY 
+        - name: USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config     
+              key: USERNAME 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-node-devops
+  namespace: devops
+  labels:
+    app: backend-node-devops
+spec:
+  selector:
+    app: backend-node-devops
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
