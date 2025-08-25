@@ -143,7 +143,7 @@ pipeline {
       }
     }
 
-  stage('Deploy to Kubernetes') {
+stage('Deploy to Kubernetes') {
   steps {
     script {
       withCredentials([
@@ -155,59 +155,53 @@ pipeline {
 
           NS="${K8S_NAMESPACE}"
           DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
+          [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # kubeconfig dentro del workspace
+          # Preparar kubeconfig dentro del workspace y montarlo de SOLO LECTURA
           mkdir -p "$WORKSPACE/.kube"
           cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
           chmod 600 "$WORKSPACE/.kube/config"
 
-          # comandos kubectl en contenedor (root, kubeconfig montado)
+          # "Aliases" para kubectl en contenedor con kubeconfig montado
           KBASE="docker run --rm --user=0:0 -e HOME=/root -e KUBECONFIG=/root/.kube/config -v $WORKSPACE/.kube:/root/.kube:ro"
           KC="$KBASE bitnami/kubectl:latest"
           KCW="$KBASE -v $WORKSPACE:/work -w /work bitnami/kubectl:latest"
 
-          # Server del registry (usa env si existe, sino fallback)
+          # 1) Crear/actualizar el imagePullSecret SIN usar archivo (pipe a apply)
           REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
           echo "Usando registry para imagePullSecret: $REG_SERVER"
 
-          echo "==> Creando/actualizando imagePullSecret nexus-docker"
-          SECRET_YAML="$WORKSPACE/.dockersecret.yaml"
-          # *** AQUÍ ESTABA EL PROBLEMA: GUARDAR LA SALIDA EN ARCHIVO ***
           $KC -n "$NS" create secret docker-registry nexus-docker \
               --docker-server="$REG_SERVER" \
               --docker-username="$REG_USER" \
               --docker-password="$REG_PASS" \
               --docker-email="noreply@local" \
-              --dry-run=client -o yaml > "$SECRET_YAML"
+              --dry-run=client -o yaml | \
+          $KC -n "$NS" apply -f -
 
-          ls -l "$SECRET_YAML" || { echo "No se generó $SECRET_YAML"; exit 2; }
-
-          # Aplica el secret desde el archivo montado
-          $KCW -n "$NS" apply -f "/work/.dockersecret.yaml"
-
-          # Aplica manifiesto de la app
-          [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
+          # 2) Aplicar manifiesto de la app (este sí requiere montar el workspace)
           echo "==> Aplicando manifiesto: $DF"
           $KCW -n "$NS" apply -f "$DF"
 
-          # Ajusta imagen al build actual
+          # 3) Forzar imagen exacta del build
           echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
           $KC -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
-          # Rollout y verificación
+          # 4) Esperar rollout y chequear réplicas
           $KC -n "$NS" rollout status deployment/backend-test --timeout=180s
           DR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
           AR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
           echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
           test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-          # Diagnóstico final
+          # 5) Diagnóstico final
           $KC -n "$NS" get pods -l app=backend-test -o wide
         '''
       }
     }
   }
 }
+
 
 
 
