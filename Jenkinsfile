@@ -48,7 +48,7 @@ pipeline{
         stage('Etapa de empaquetado y delivery'){
           steps{
             script{
-                docker.withRegistry('https://index.docker.io/v2/', 'f9e70e70-833b-4fbe-9635-7c57ea832e76'){ 
+                docker.withRegistry('https://docker.io', 'f9e70e70-833b-4fbe-9635-7c57ea832e76'){ 
                     sh 'docker build -t backend-test:cma .'
                     sh 'docker tag backend-test:cma dockermonges/backend-test:cma'
                     sh 'docker push dockermonges/backend-test:cma'
