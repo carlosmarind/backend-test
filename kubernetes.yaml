@@ -25,32 +25,11 @@ spec:
         image: localhost:8082/backend-node-devops:latest
         imagePullPolicy: Always
         env:
-        - name: NODE_ENV_SECUNDARIA
+        - name: NODE_ENV
           value: development
         - name: PORT_SECUNDARIO
           value: "3000"
-        - name: PORT
-          valueFrom:
-            configMapKeyRef:
-              name: cm-backend
-              key: PORT
-        - name: NODE_ENV
-          valueFrom:
-            configMapKeyRef:
-              name: cm-backend
-              key: NODE_ENV
-        - name: BBDD_URL
-          valueFrom:
-            configMapKeyRef:
-              name: cm-backend
-              key: BBDD_URL
-        - name: PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: sc-backend
-              key: PASSWORD
-      imagePullSecrets:
-      - name: docker-registry-secret
+
 ---
 apiVersion: v1
 kind: Service
@@ -66,29 +45,3 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 3000
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ingress-backend-devops
-  namespace: devops
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-production
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: backend.devops.cl
-    http:
-      paths:
-      - path: /
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: backend-node-devops
-            port:
-              number: 80
-  tls:
-  - hosts:
-    - backend.devops.cl
-    secretName: backend-tls
