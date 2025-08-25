@@ -1,17 +1,25 @@
 # Etapa 1: build
 FROM node:22-alpine AS build
-WORKDIR /app
+
+WORKDIR /usr/src/app
+
+# Copiar package.json e instalar dependencias
 COPY package*.json ./
 RUN npm install
+
+# Copiar todo el código y construir
 COPY . .
 RUN npm run build
 
 # Etapa 2: runtime
 FROM node:22-alpine
-WORKDIR /app
-ENV NODE_ENV=production
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY --from=build /app/dist ./dist
-EXPOSE 3000
+
+WORKDIR /usr/src/app
+
+# Copiar sólo lo necesario de la build
+COPY --from=build /usr/src/app/package*.json ./
+COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/node_modules ./node_modules
+
+EXPOSE 4000
 CMD ["node", "dist/main.js"]
