@@ -126,7 +126,9 @@ pipeline {
     script {
       withCredentials([
         file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
-        usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
+        usernamePassword(credentialsId: 'nexus-credentials',
+          usernameVariable: 'REG_USER',
+          passwordVariable: 'REG_PASS')
       ]) {
         sh '''
           set -eux
@@ -135,51 +137,65 @@ pipeline {
           DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
           [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # kubeconfig dentro del workspace
+          # 1) Prepara kubeconfig (SOLO LECTURA) en un path estándar
           mkdir -p "$WORKSPACE/.kube"
           cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
           chmod 600 "$WORKSPACE/.kube/config"
 
-          # Aliases para kubectl en contenedor
-          KBASE="docker run --rm --user=0:0 -e HOME=/root -e KUBECONFIG=/root/.kube/config -v $WORKSPACE/.kube:/root/.kube:ro"
+          # 2) Alias para invocar kubectl en contenedor (sin montar workspace)
+          KBASE="docker run --rm --user=0:0 \
+                 -e HOME=/root -e KUBECONFIG=/root/.kube/config \
+                 -v $WORKSPACE/.kube:/root/.kube:ro"
           KC="$KBASE bitnami/kubectl:latest"
-          KCW="$KBASE -v $WORKSPACE:/work:rw -w /work bitnami/kubectl:latest"
 
-          # --- FIX 1: generar YAML del secret a archivo ---
+          # 3) ImagePullSecret (TODO por pipe; sin archivos)
           REG_SERVER="${NEXUS_REGISTRY}"
-          SECRET_FILE="$WORKSPACE/.dockersecret.yaml"
           echo "Usando registry para imagePullSecret: $REG_SERVER"
 
-          $KC -n "$NS" create secret docker-registry nexus-docker \
-              --docker-server="$REG_SERVER" \
-              --docker-username="$REG_USER" \
-              --docker-password="$REG_PASS" \
-              --docker-email="noreply@local" \
-              --dry-run=client -o yaml > "$SECRET_FILE"
+          # Captura el YAML del secret y aplícalo por STDIN
+          SECRET_YAML="$($KC -n "$NS" create secret docker-registry nexus-docker \
+                           --docker-server="$REG_SERVER" \
+                           --docker-username="$REG_USER" \
+                           --docker-password="$REG_PASS" \
+                           --docker-email="noreply@local" \
+                           --dry-run=client -o yaml || true)"
 
-          ls -l "$SECRET_FILE"; head -n2 "$SECRET_FILE" || true
+          if [ -n "$SECRET_YAML" ]; then
+            printf "%s" "$SECRET_YAML" | $KC -n "$NS" apply -f -
+          else
+            echo "WARN: kubectl no produjo YAML del secret (intentando create/apply directos)"
+            $KC -n "$NS" delete secret nexus-docker --ignore-not-found
+            $KC -n "$NS" create secret docker-registry nexus-docker \
+                --docker-server="$REG_SERVER" \
+                --docker-username="$REG_USER" \
+                --docker-password="$REG_PASS" \
+                --docker-email="noreply@local"
+          fi
 
-          # --- FIX 2: aplicar con ruta ABSOLUTA dentro del contenedor ---
-          $KCW -n "$NS" apply -f /work/.dockersecret.yaml
-
+          # 4) Aplica el manifiesto de la app por STDIN (sin montar workspace)
           echo "==> Aplicando manifiesto: $DF"
-          $KCW -n "$NS" apply -f "/work/$DF"
+          cat "$DF" | $KC -n "$NS" apply -f -
 
+          # 5) Fuerza la imagen exacta del build
           echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
-          $KC -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
+          $KC -n "$NS" set image deployment/backend-test \
+              backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
+          # 6) Espera rollout y valida réplicas
           $KC -n "$NS" rollout status deployment/backend-test --timeout=180s
           DR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
           AR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
           echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
           test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
+          # 7) Diagnóstico final útil
           $KC -n "$NS" get pods -l app=backend-test -o wide
         '''
       }
     }
   }
 }
+
 
   }
 
