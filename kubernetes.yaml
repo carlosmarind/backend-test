@@ -11,7 +11,7 @@ metadata:
   labels:
     app: backend-node-devops
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: backend-node-devops
@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
       - name: backend-node-devops
-        image: localhost:8082/backend-node-devops:cmd
+        image: localhost:8082/backend-node-devops:latest
         imagePullPolicy: Always
         env:
         - name: NODE_ENV_SECUNDARIA

@@ -62,14 +62,20 @@ pipeline {
             steps {
                 sh 'docker build -t backend-node-devops:cmd .'
                 sh "docker tag backend-node-devops:cmd localhost:8082/backend-node-devops:${BUILD_NUMBER}"
+                sh "docker tag backend-node-devops:cmd localhost:8082/backend-node-devops:latest"
                 script {
                     docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
                         sh "docker push localhost:8082/backend-node-devops:${BUILD_NUMBER}"
                     }
                 }
+                script {
+                    docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
+                        sh "docker push localhost:8082/backend-node-devops:latest"
+                    }
+                }
             }
         }
-        stage('Despliegue continuo') {
+        stage('Actualización de imagen de kubernetes a partir del pipeline') {
             when {
                 branch 'main'
             }
