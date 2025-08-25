@@ -108,6 +108,23 @@ pipeline {
       }
     }
 
+stage('Preflight registry') {
+  steps {
+    sh '''
+      set -eu
+      echo "Comprobando insecure-registries en el daemon de Docker…"
+      if ! docker info 2>/dev/null | grep -q 'host.docker.internal:8082'; then
+        echo "ERROR: falta configurar insecure-registries: host.docker.internal:8082"
+        echo "En Docker Desktop -> Settings -> Docker Engine, agrega:"
+        echo '{ "insecure-registries": ["host.docker.internal:8082","localhost:8082","127.0.0.1:8082"] }'
+        exit 2
+      fi
+      echo "OK: host.docker.internal:8082 está en insecure-registries."
+    '''
+  }
+}
+
+
     stage('Docker Build & Push (Nexus)') {
       steps {
         script {
