@@ -56,7 +56,7 @@ describe('AppController (e2e)', () => {
         ['4808186-k', 'Rut valido k1'],
         ['8072232-K', 'Rut valido K1']
     ])('Deberia retornar 200 porque es un rut valido: %s (%s)', async (rut, descripcion) => {
-        return request(app.getHttpServer())
+        return await request(app.getHttpServer())
             .get(`/validate-rut?rut=${rut}`)
             .expect(200)
             .expect((res) => {
@@ -71,7 +71,7 @@ describe('AppController (e2e)', () => {
         ['', 'Rut invalido 3'],
         ['-4', 'Rut invalido 4']
     ])('Deberia retornar 400 porque es un rut invalido: %s (%s)', async (rut, descripcion) => {
-        return request(app.getHttpServer())
+        return await request(app.getHttpServer())
             .get(`/validate-rut?rut=${rut}`)
             .expect(400)
             .expect((res) => {
@@ -94,32 +94,32 @@ describe('AppController (e2e)', () => {
 
     //BEGIN /operaciones
     it.each([
+        ['suma', '1', 1, 2, 'Prueba suma valida'],
+        ['suma', 1, '1', 2, 'Prueba suma valida'],
         ['suma', 1, 1, 2, 'Prueba suma 1+1 valida'],
         ['suma', 1, -1, 0, 'Prueba suma 1+(-1) valida'],
         ['suma', -1, 1, 0, 'Prueba suma -1+1 valida'],
         ['suma', -1, -1, -2, 'Prueba suma -1+(-1) valida'],
-        //['suma', '1', 1, 2, 'Prueba suma valida'],
-        //['suma', 1, '1', 2, 'Prueba suma valida'],
-       // ['resta', '1', 1, 0, 'Prueba resta valida'],
-        //['resta', 1, '1', 0, 'Prueba resta valida'],
+        ['resta', '1', 1, 0, 'Prueba resta valida'],
+        ['resta', 1, '1', 0, 'Prueba resta valida'],
         ['resta', 1, 1, 0, 'Prueba resta 1-1 valida'],
         ['resta', 1, -1, 2, 'Prueba resta 1-(-1) valida'],
         ['resta', -1, 1, -2, 'Prueba resta -1-1 valida'],
         ['resta', -1, -1, 0, 'Prueba resta -1-(-1) valida'],
-        //['multiplicacion', '2', 2, 4, 'Prueba multiplicacion valida'],
-        //['multiplicacion', 2, '2', 4, 'Prueba multiplicacion valida'],
+        ['multiplicacion', '2', 2, 4, 'Prueba multiplicacion valida'],
+        ['multiplicacion', 2, '2', 4, 'Prueba multiplicacion valida'],
         ['multiplicacion', 2, 2, 4, 'Prueba multiplicacion 2*2 valida'],
         ['multiplicacion', 2, -2, -4, 'Prueba multiplicacion 2*(-2) valida'],
         ['multiplicacion', -2, 2, -4, 'Prueba multiplicacion -2*2 valida'],
         ['multiplicacion', -2, -2, 4, 'Prueba multiplicacion -2*(-2) valida'],
-        //['division', '2', 2, 1, 'Prueba division valida'],
-        //['division', 2, '2', 1, 'Prueba division valida'],
+        ['division', '2', 2, 1, 'Prueba division valida'],
+        ['division', 2, '2', 1, 'Prueba division valida'],
         ['division', 2, 2, 1, 'Prueba division 2/2 valida'],
         ['division', 2, -2, -1, 'Prueba division 2/(-2) valida'],
         ['division', -2, 2, -1, 'Prueba division -2/2 valida'],
         ['division', -2, -2, 1, 'Prueba division -2/(-2) valida']
     ])('Operaciones validas', async (operacion, a, b, expectedResult, descripcion) => {
-        return request(app.getHttpServer())
+        return await request(app.getHttpServer())
             .get(`/operaciones?operacion=${operacion}&a=${a}&b=${b}`)
             .expect(200)
             .expect((res) => {
@@ -142,7 +142,7 @@ describe('AppController (e2e)', () => {
         ['division', 'a', 'b', NaN, 'Prueba division invalida sin numeros'],
         ['division', 2, 0, NaN, 'Prueba division invalida division por 0']
     ])('Operaciones invalidas', async (operacion, a, b, expectedResult, descripcion) => {
-        return request(app.getHttpServer())
+        return await request(app.getHttpServer())
             .get(`/operaciones?operacion=${operacion}&a=${a}&b=${b}`)
             .expect(502)
             .expect((res) => {
