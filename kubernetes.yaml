@@ -1,0 +1,79 @@
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ebl
+ 
+---
+ 
+# ConfigMap para USERNAME
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: ebl
+data:
+  USERNAME: "ebl-test"
+ 
+---
+ 
+# Secret Opaque para API_KEY
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-test-secrets
+  namespace: ebl
+type: Opaque
+data:
+  # API_KEY en base64, por ejemplo: echo -n "mi-api-key" | base64
+  API_KEY: bWktYXBpLWtleQ==
+ 
+---
+ 
+# Deployment con 3 réplicas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-test
+  namespace: ebl
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-test
+  template:
+    metadata:
+      labels:
+        app: backend-test
+    spec:
+      containers:
+        - name: backend
+          image: edgardobenavidesl/backend-test:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-test-secrets
+      # Secret para pull de imágenes privadas
+      imagePullSecrets:
+        - name: nexus-cred
+ 
+---
+ 
+# Service para la aplicación
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-test
+  namespace: ebl
+spec:
+  selector:
+    app: backend-test
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP
+ 

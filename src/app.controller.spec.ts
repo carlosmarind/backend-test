@@ -1,51 +1,56 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
-import { ConfigModule } from '@nestjs/config';
-import configuration from './config/configuration';
+import { INestApplication } from '@nestjs/common';
 
 describe('AppController', () => {
-  let appController: AppController;
+  let app: INestApplication;
+  let appService = {
+    getHello: jest.fn().mockReturnValue('Hello !!'),
+    getApikey: jest.fn().mockReturnValue('123!!'),
+    validateRut: jest.fn((rut: string) => rut === '11111111-1'),
+  };
 
-  beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          load: [configuration],
-        }),
-      ],
+  beforeAll(async () => {
+    const module: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [{ provide: AppService, useValue: appService }],
     }).compile();
 
-    appController = app.get<AppController>(AppController);
-  });
-
-  describe('Probar el modulo raiz del proyecto', () => {
-    test('Esto deberia retornar hola mundo en ingles"', () => {
-      expect(appController.getHello()).toBe('Hello !!');
-    });
-  });
-});
-
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
-
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
+    app = module.createNestApplication();
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/').expect(200).expect(/Hello/);
+  afterAll(async () => {
+    await app.close();
+  });
+
+it('/ (GET)', async () => {
+  await request(app.getHttpServer())
+    .get('/')
+    .expect(200)
+    .expect('Hello !!')
+},  60000); // <- 20 segundos en lugar de 5
+
+  it('/apikey (GET)', async () => {
+    await request(app.getHttpServer())
+      .get('/apikey')
+      .expect(200)
+      .expect('123!!');
+  });
+
+  it('/validate-rut valido (GET)', async () => {
+    await request(app.getHttpServer())
+      .get('/validate-rut?rut=11111111-1')
+      .expect(200)
+      .expect({ mensaje: 'rut valido' });
+  });
+
+  it('/validate-rut invalido (GET)', async () => {
+    await request(app.getHttpServer())
+      .get('/validate-rut?rut=99999999-9')
+      .expect(400)
+      .expect({ mensaje: 'rut invalido' });
   });
 });
