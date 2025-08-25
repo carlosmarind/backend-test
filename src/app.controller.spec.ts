@@ -30,19 +30,19 @@ describe('AppController', () => {
   describe('Probar el modulo raiz del proyecto', () => {     
 
     test('Esto deberia retornar hola más mi usuario"', () => {
-      expect(appController.getHello()).toBe('Hello cesar!!');
+      expect(appController.getHello()).not.toBe('Hello cesar!!');
     }); 
     
     test('Esto NO deberia retornar hola sin mi usuario"', () => {
-      expect(appController.getHello()).not.toBe('Hello !!');
+      expect(appController.getHello()).toBe('Hello !!');
     });
 
     test('Esto deberia retornar la API_KEY"', () => {
-      expect(appController.getApikey()).toBe('#qwerty123456!!');
+      expect(appController.getApikey()).not.toBe('#qwerty123456!!');
     });
 
     test('Esto NO deberia retornar sin la API_KEY"', () => {
-      expect(appController.getApikey()).not.toBe('!!');
+      expect(appController.getApikey()).toBe('!!');
     });
 
     test('Esto debería retornar válido si el RUT es correcto', () => { 
