@@ -169,18 +169,18 @@ pipeline {
 
               echo "==> Creando/actualizando imagePullSecret nexus-docker para ${NEXUS_REGISTRY_PULL}"
               SECRET_YAML="$WORKSPACE/.dockersecret.yaml"
+
+              # Genera YAML del secret y:
+              # 1) lo guarda en el host con 'tee' para depurar si hace falta
+              # 2) lo pasa por pipe a 'kubectl apply -f -' dentro del contenedor
               $KC -n "$NS" create secret docker-registry nexus-docker \
                 --docker-server="${NEXUS_REGISTRY_PULL}" \
                 --docker-username="${REG_USER}" \
                 --docker-password="${REG_PASS}" \
                 --docker-email="noreply@local" \
-                --dry-run=client -o yaml > "$SECRET_YAML"
-
-              # Aplica el secret desde archivo (evita problemas de pipe/STDIN)
-              $KC -n "$NS" apply -f "$SECRET_YAML"
-
-              echo "==> Aplicando manifiesto ${DF}"
-              $KCW -n "$NS" apply -f "$DF"
+                --dry-run=client -o yaml \
+              | tee "$SECRET_YAML" \
+              | $KC -n "$NS" apply -f -
 
               echo "==> Forzando imagen a tag del build"
               $KC -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME_PULL}:${BUILD_NUMBER}
