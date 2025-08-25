@@ -10,7 +10,7 @@ pipeline {
     BUILD_TAG          = "${env.BUILD_NUMBER}"
     MAX_IMAGES_TO_KEEP = '5'
     K8S_NAMESPACE      = 'default'
-    DEPLOYMENT_FILE    = 'kubernetes.yaml'               // ajusta si está en otra ruta (p.ej. k8s/kubernetes.yaml)
+    DEPLOYMENT_FILE    = 'kubernetes.yaml'               // ajusta si está en k8s/kubernetes.yaml
   }
 
   options { timeout(time: 45, unit: 'MINUTES') }
@@ -107,9 +107,12 @@ pipeline {
       steps {
         script {
           docker.image(env.IMAGE_TOOLING).inside('-v /var/run/docker.sock:/var/run/docker.sock --network devnet') {
-            // Asegúrate que 'nexus-credentials' sea de tipo "Username with password"
-            withCredentials([usernamePassword(credentialsId: 'nexus-credentials',
-              usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+            // Recomendado: 'nexus-credentials' como "Username with password"
+            withCredentials([usernamePassword(
+              credentialsId: 'nexus-credentials',
+              usernameVariable: 'NEXUS_USER',
+              passwordVariable: 'NEXUS_PASS'
+            )]) {
               sh '''
                 set -eux
                 echo "$NEXUS_PASS" | docker login -u "$NEXUS_USER" --password-stdin http://${NEXUS_REGISTRY}
@@ -144,7 +147,7 @@ pipeline {
                 KENV="-e KUBECONFIG=/kubeconfig"
                 KMOUNT="-v $KCONF:/kubeconfig:ro"
 
-                # Apply
+                # Apply (por stdin, evita montar workspace)
                 cat "$DF" | docker run --rm -i --network devnet \
                   $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" apply -f -
 
@@ -167,7 +170,7 @@ pipeline {
 
               elif [ -d "$KCONF" ]; then
                 echo "Kubeconfig es un directorio: $KCONF"
-                # Usa 'config' si existe; sino, toma el primer .yaml/.yml
+                # Usa 'config' si existe; si no, el primer .yaml/.yml
                 if [ -f "$KCONF/config" ]; then
                   KFILE="config"
                 else
@@ -178,19 +181,15 @@ pipeline {
                 KENV="-e KUBECONFIG=/kube/$KFILE"
                 KMOUNT="-v $KCONF:/kube:ro"
 
-                # Apply
                 cat "$DF" | docker run --rm -i --network devnet \
                   $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" apply -f -
 
-                # set image
                 docker run --rm --network devnet $KENV $KMOUNT \
                   bitnami/kubectl:latest -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
 
-                # rollout
                 docker run --rm --network devnet $KENV $KMOUNT \
                   bitnami/kubectl:latest -n "$NS" rollout status deployment/backend-test --timeout=180s
 
-                # verificación
                 DR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
                 AR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
                 echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
@@ -207,8 +206,7 @@ pipeline {
         }
       }
     }
-
-  
+  }  
 
   post {
     always {
@@ -216,4 +214,4 @@ pipeline {
       deleteDir()
     }
   }
-}
+} 
