@@ -148,36 +148,65 @@ pipeline {
       }
     }
 
-    stage('Deploy to Kubernetes (namespace ebl)') {
-      steps {
-        script {
-          def insideArgs = '--add-host=host.docker.internal:host-gateway -v /var/run/docker.sock:/var/run/docker.sock --network devnet'
-          docker.image(env.IMAGE_TOOLING).inside(insideArgs) {
-            sh """
-              set -eux
+      stage('Deploy to Kubernetes (namespace ebl)') {
+        steps {
+          script {
+            // acceso al docker.sock + resolución hacia el host y Docker Desktop k8s
+            def insideArgs = '--add-host=host.docker.internal:host-gateway ' +
+                            '--add-host=kubernetes.docker.internal:host-gateway ' +
+                            '-v /var/run/docker.sock:/var/run/docker.sock ' +
+                            '--network devnet'
 
-              # Instala kubectl si no está (ephemeral, dentro del contenedor tooling)
-              if ! command -v kubectl >/dev/null 2>&1; then
-                curl -fsSLo /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
-                chmod +x /usr/local/bin/kubectl
-              fi
+            docker.image(env.IMAGE_TOOLING).inside(insideArgs) {
+              // Usa tu credencial Secret file con ID = kubeconfig
+              withCredentials([file(credentialsId: 'kubeconfig', variable: 'KCFG')]) {
+                sh """
+                  set -eux
 
-              # Asegurar namespace y recursos base (idempotente)
-              kubectl get ns ${K8S_NAMESPACE} >/dev/null 2>&1 || kubectl create namespace ${K8S_NAMESPACE}
-              if [ -f "${DEPLOYMENT_FILE}" ]; then
-                kubectl apply -f "${DEPLOYMENT_FILE}"
-              fi
+                  # Instalar kubectl (si no está)
+                  if ! command -v kubectl >/dev/null 2>&1; then
+                    curl -fsSLo /usr/local/bin/kubectl \\
+                      https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
+                    chmod +x /usr/local/bin/kubectl
+                  fi
 
-              # Actualiza solo la imagen del container del Deployment
-              kubectl -n ${K8S_NAMESPACE} set image deploy/${DEPLOYMENT_NAME} ${CONTAINER_NAME}=${IMAGE_NAME}:${BUILD_NUMBER} --record
+                  export KUBECONFIG="\$KCFG"
 
-              # Espera el rollout
-              kubectl -n ${K8S_NAMESPACE} rollout status deploy/${DEPLOYMENT_NAME} --timeout=180s
-            """
+                  echo "== Endpoint del cluster =="
+                  SERVER=\$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+                  echo "\$SERVER"
+
+                  # Aviso temprano si el kubeconfig apunta a localhost/127.0.0.1 (no accesible desde el contenedor)
+                  case "\$SERVER" in
+                    https://127.0.0.1*|https://localhost*)
+                      echo "ERROR: tu kubeconfig apunta a \$SERVER (no accesible desde el contenedor)."
+                      echo "Usa el kubeconfig de Docker Desktop (server kubernetes.docker.internal) o genera uno accesible y con certs embebidos."
+                      exit 2
+                      ;;
+                  esac
+
+                  # Diagnóstico rápido
+                  kubectl version --client
+                  kubectl cluster-info
+                  kubectl get nodes
+
+                  # Asegurar namespace y aplicar manifiestos base si existe el archivo
+                  kubectl get ns ${K8S_NAMESPACE} >/dev/null 2>&1 || kubectl create namespace ${K8S_NAMESPACE}
+                  if [ -f "${DEPLOYMENT_FILE}" ]; then
+                    kubectl apply -f "${DEPLOYMENT_FILE}"
+                  fi
+
+                  # Actualiza imagen y espera rollout
+                  kubectl -n ${K8S_NAMESPACE} set image deploy/${DEPLOYMENT_NAME} \\
+                    ${CONTAINER_NAME}=${IMAGE_NAME}:${BUILD_NUMBER} --record
+                  kubectl -n ${K8S_NAMESPACE} rollout status deploy/${DEPLOYMENT_NAME} --timeout=180s
+                """
+              }
+            }
           }
         }
       }
-    }
+
   }
 
   post {
