@@ -161,28 +161,31 @@ pipeline {
           cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
           chmod 600 "$WORKSPACE/.kube/config"
 
-          # kubectl en contenedor (siempre root; kubeconfig montado)
+          # comandos kubectl en contenedor (root, kubeconfig montado)
           KBASE="docker run --rm --user=0:0 -e HOME=/root -e KUBECONFIG=/root/.kube/config -v $WORKSPACE/.kube:/root/.kube:ro"
           KC="$KBASE bitnami/kubectl:latest"
           KCW="$KBASE -v $WORKSPACE:/work -w /work bitnami/kubectl:latest"
 
-          # ====== FIX CLAVE: valor por defecto si NEXUS_REGISTRY no viene del entorno ======
+          # Server del registry (usa env si existe, sino fallback)
           REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
           echo "Usando registry para imagePullSecret: $REG_SERVER"
 
           echo "==> Creando/actualizando imagePullSecret nexus-docker"
           SECRET_YAML="$WORKSPACE/.dockersecret.yaml"
+          # *** AQUÍ ESTABA EL PROBLEMA: GUARDAR LA SALIDA EN ARCHIVO ***
           $KC -n "$NS" create secret docker-registry nexus-docker \
               --docker-server="$REG_SERVER" \
-              --docker-username="${REG_USER}" \
-              --docker-password="${REG_PASS}" \
+              --docker-username="$REG_USER" \
+              --docker-password="$REG_PASS" \
               --docker-email="noreply@local" \
               --dry-run=client -o yaml > "$SECRET_YAML"
 
-          # Aplica el secret (desde /work dentro del contenedor)
+          ls -l "$SECRET_YAML" || { echo "No se generó $SECRET_YAML"; exit 2; }
+
+          # Aplica el secret desde el archivo montado
           $KCW -n "$NS" apply -f "/work/.dockersecret.yaml"
 
-          # Aplica manifiesto
+          # Aplica manifiesto de la app
           [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
           echo "==> Aplicando manifiesto: $DF"
           $KCW -n "$NS" apply -f "$DF"
@@ -198,13 +201,14 @@ pipeline {
           echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
           test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-          # Diagnóstico
+          # Diagnóstico final
           $KC -n "$NS" get pods -l app=backend-test -o wide
         '''
       }
     }
   }
 }
+
 
 
     
