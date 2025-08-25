@@ -48,10 +48,10 @@ pipeline{
         stage('Etapa de empaquetado y delivery'){
           steps{
             script{
-                docker.withRegistry('https://docker.io', 'f9e70e70-833b-4fbe-9635-7c57ea832e76'){ 
-                    sh 'docker build -t backend-test:cma .'
-                    sh 'docker tag backend-test:cma dockermonges/backend-test:cma'
-                    sh 'docker push dockermonges/backend-test:cma'
+                docker.withRegistry('https://index.docker.io/v2/', 'f9e70e70-833b-4fbe-9635-7c57ea832e76'){ 
+                    sh 'docker build -t backend-test:cma2 .'
+                    sh 'docker tag backend-test:cma2 dockermonges/backend-test:cma2'
+                    sh 'docker push dockermonges/backend-test:cma2'
                 }
                 docker.withRegistry('http://localhost:8082', 'nexus-credencial'){  
                     sh 'docker tag backend-test:cma localhost:8082/cesar/backend-test:cma'
