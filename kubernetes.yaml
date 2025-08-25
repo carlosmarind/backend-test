@@ -1,25 +1,41 @@
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ebl
+ 
+---
+ 
+# ConfigMap para USERNAME
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: app-config
+  name: backend-config
+  namespace: ebl
 data:
-  USERNAME: "userkube"
-
+  USERNAME: "ebl-test"
+ 
 ---
+ 
+# Secret Opaque para API_KEY
 apiVersion: v1
 kind: Secret
 metadata:
-  name: app-secrets
+  name: backend-test-secrets
+  namespace: ebl
 type: Opaque
-stringData:
-  # (opcional) gestiona tus secretos de app aquí
-  API_KEY: "REEMPLAZA_CON_TU_API_KEY"
-
+data:
+  # API_KEY en base64, por ejemplo: echo -n "mi-api-key" | base64
+  API_KEY: bWktYXBpLWtleQ==
+ 
 ---
+ 
+# Deployment con 3 réplicas
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend-test
+  namespace: ebl
 spec:
   replicas: 3
   selector:
@@ -30,37 +46,34 @@ spec:
       labels:
         app: backend-test
     spec:
-      imagePullSecrets:
-        - name: nexus-docker   # el Jenkinsfile lo crea/actualiza antes del apply
       containers:
-        - name: backend-test
-          # Imagen base; luego el pipeline la fuerza a :${BUILD_NUMBER}
-          image: host.docker.internal:8082/backend-test:latest
+        - name: backend
+          image: edgardobenavidesl/backend-test:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
-          env:
-            - name: USERNAME
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: USERNAME
-            # - name: API_KEY
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: app-secrets
-            #       key: API_KEY
-
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-test-secrets
+      # Secret para pull de imágenes privadas
+      imagePullSecrets:
+        - name: nexus-cred
+ 
 ---
+ 
+# Service para la aplicación
 apiVersion: v1
 kind: Service
 metadata:
   name: backend-test
+  namespace: ebl
 spec:
-  type: ClusterIP
   selector:
     app: backend-test
   ports:
-    - name: http
-      port: 80
+    - port: 80
       targetPort: 3000
+  type: ClusterIP
+ 
