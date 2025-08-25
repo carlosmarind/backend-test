@@ -1,12 +1,13 @@
 pipeline {
   agent any
   options { timestamps(); skipDefaultCheckout(true) }
+
   environment {
-    REGISTRY      = "host.docker.internal:8083"
-    REPOSITORY    = "backend-test"
-    IMAGE_LATEST  = "${env.REGISTRY}/${env.REPOSITORY}:latest"
-    IMAGE_BUILD   = "${env.REGISTRY}/${env.REPOSITORY}:${env.BUILD_NUMBER}"
-    SCANNER_HOME  = tool 'SonarScanner'
+    REGISTRY     = "host.docker.internal:8083"
+    REPOSITORY   = "backend-test"
+    IMAGE_LATEST = "${env.REGISTRY}/${env.REPOSITORY}:latest"
+    IMAGE_BUILD  = "${env.REGISTRY}/${env.REPOSITORY}:${env.BUILD_NUMBER}"
+    SCANNER_HOME = tool 'SonarScanner'
   }
 
   stages {
@@ -16,29 +17,27 @@ pipeline {
 
     stage('Install & Test') {
       steps {
-        powershell "npm ci; npm test -- --coverage"
+        powershell 'npm ci; npm test -- --coverage'
       }
     }
 
-stage('Sonar') {
-  steps {
-    withSonarQubeEnv('sonarqube') {
-      powershell '''
-        & "$env:SCANNER_HOME\\bin\\sonar-scanner.bat" `
-          -D"sonar.projectKey=backend-test" `
-          -D"sonar.projectName=backend-test" `
-          -D"sonar.sourceEncoding=UTF-8" `
-          -D"sonar.sources=src" `
-          -D"sonar.tests=src" `
-          -D"sonar.test.inclusions=**/*.spec.ts,**/*.test.ts" `
-          -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" `
-          -D"sonar.typescript.lcov.reportPaths=coverage/lcov.info"
-      '''
+    stage('Sonar') {
+      steps {
+        withSonarQubeEnv('sonarqube') {
+          powershell '''
+            & "$env:SCANNER_HOME\\bin\\sonar-scanner.bat" `
+              -D"sonar.projectKey=backend-test" `
+              -D"sonar.projectName=backend-test" `
+              -D"sonar.sourceEncoding=UTF-8" `
+              -D"sonar.sources=src" `
+              -D"sonar.tests=src" `
+              -D"sonar.test.inclusions=**/*.spec.ts,**/*.test.ts" `
+              -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" `
+              -D"sonar.typescript.lcov.reportPaths=coverage/lcov.info"
+          '''
+        }
+      }
     }
-  }
-}
-
-
 
     stage('Quality Gate') {
       steps {
@@ -51,18 +50,19 @@ stage('Sonar') {
     stage('Docker build & push') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'nexus-docker', usernameVariable: 'U', passwordVariable: 'P')]) {
-          powershell """
+          powershell '''
             docker build -t $env:IMAGE_BUILD -t $env:IMAGE_LATEST .
-            \$env:P | docker login $env:REGISTRY -u $env:U --password-stdin
+            $env:P | docker login $env:REGISTRY -u $env:U --password-stdin
             docker push $env:IMAGE_BUILD
             docker push $env:IMAGE_LATEST
             docker logout $env:REGISTRY
-          """
+          '''
         }
       }
     }
 
     stage('K8s deploy') {
+      when { branch 'main' }   // ← opcional, recomendado
       steps {
         withCredentials([file(credentialsId: 'kubeconfig', variable: 'KCFG')]) {
           powershell '''
