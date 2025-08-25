@@ -121,7 +121,7 @@ pipeline {
       }
     }
 
- stage('Deploy to Kubernetes') {
+stage('Deploy to Kubernetes') {
   steps {
     script {
       withCredentials([
@@ -136,24 +136,26 @@ pipeline {
           DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
           [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # Copiamos el kubeconfig a un archivo y lo montamos como SOLO LECTURA.
-          KUBE_FILE="$WORKSPACE/kubeconfig"
-          cp "$KUBECONFIG_FILE" "$KUBE_FILE"
-          chmod 600 "$KUBE_FILE"
+          # Limpieza para evitar colisiones previas (carpeta 'kubeconfig' etc.)
+          rm -rf "$WORKSPACE/kubeconfig" "$WORKSPACE/.kube" || true
+          rm -f  "$WORKSPACE/kubeconfig.yaml" || true
 
-          # Alias kubectl dentro del contenedor:
-          # -i para pipes (apply -f -), --kubeconfig forzado a la ruta montada.
+          # Copiamos SIEMPRE a un archivo con nombre fijo
+          cp "$KUBECONFIG_FILE" "$WORKSPACE/kubeconfig.yaml"
+          chmod 600 "$WORKSPACE/kubeconfig.yaml"
+
+          # kubectl en contenedor SIEMPRE con --kubeconfig al archivo montado
           KCA="docker run --rm -i --user=0:0 \
-               -v $KUBE_FILE:/kube/config:ro \
+               -v $WORKSPACE/kubeconfig.yaml:/kube/config:ro \
                bitnami/kubectl:latest \
                --kubeconfig=/kube/config"
 
-          # (Opcional) Detectar contexto actual del kubeconfig por si quieres fijarlo
+          # (opcional) contexto actual por si quieres fijarlo
           CTX="$($KCA config view -o jsonpath='{.current-context}' || true)"
           [ -n "$CTX" ] && KCTX="--context=$CTX" || KCTX=""
 
-          # 1) Crear/actualizar imagePullSecret en el cluster (por STDIN)
-          REG_SERVER="${NEXUS_REGISTRY}"
+          # 1) imagePullSecret -> por STDIN, sin archivos intermedios
+          REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
           echo "Usando registry para imagePullSecret: $REG_SERVER"
 
           $KCA $KCTX -n "$NS" create secret docker-registry nexus-docker \
@@ -164,14 +166,14 @@ pipeline {
             --dry-run=client -o yaml \
           | $KCA $KCTX -n "$NS" apply --validate=false -f -
 
-          # 2) Aplicar manifiesto de la app por STDIN (evita montar el workspace)
+          # 2) Aplicar manifiesto de la app por STDIN
           echo "==> Aplicando manifiesto: $DF"
           cat "$DF" | $KCA $KCTX -n "$NS" apply --validate=false -f -
 
-          # 3) Forzar la imagen exacta del build
+          # 3) Forzar imagen exacta del build
           echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
           $KCA $KCTX -n "$NS" set image deployment/backend-test \
-              backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
+            backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
           # 4) Esperar rollout y validar réplicas
           $KCA $KCTX -n "$NS" rollout status deployment/backend-test --timeout=180s
@@ -187,6 +189,7 @@ pipeline {
     }
   }
 }
+
 
 
 
