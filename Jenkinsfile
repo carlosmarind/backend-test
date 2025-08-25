@@ -131,11 +131,10 @@ pipeline {
         script {
           withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')]) {
             sh '''
-              set -euxo pipefail
+              set -eux
               NS="${K8S_NAMESPACE}"
               KCONF="$KUBECONFIG_FILE"
 
-              # Detecta el manifiesto si no está en la raíz
               DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
               if [ ! -f "$DF" ]; then
                 echo "Deployment file '$DF' no encontrado. Buscando candidatos..."
@@ -148,26 +147,22 @@ pipeline {
               echo "Usando manifiesto: $DF"
               echo "Workspace: $WORKSPACE"; ls -la
 
-              # Aplica manifiesto (monta el workspace completo y kubeconfig)
               docker run --rm --network devnet \
                 -v "$KCONF:/root/.kube/config:ro" \
                 -v "$WORKSPACE:/work" -w /work \
                 bitnami/kubectl:latest \
                 -n "$NS" apply -f "$DF"
 
-              # Actualiza imagen al último tag
               docker run --rm --network devnet \
                 -v "$KCONF:/root/.kube/config:ro" \
                 bitnami/kubectl:latest \
                 -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
 
-              # Espera rollout
               docker run --rm --network devnet \
                 -v "$KCONF:/root/.kube/config:ro" \
                 bitnami/kubectl:latest \
                 -n "$NS" rollout status deployment/backend-test --timeout=180s
 
-              # Verificación: disponibles == deseadas
               DR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
               AR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
               echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
