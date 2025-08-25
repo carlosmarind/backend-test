@@ -43,19 +43,20 @@ pipeline{
                         }                      
                     }
                 } 
-            }
-            stage ('Quality gate'){
-                steps{
-                    timeout(time: 30, unit: 'SECONDS'){
-                        script{
-                            def qg = waitForQualityGate()
-                            if(qg.status != 'OK'){
-                               error "La puerta de calidad no pasó: ${qg.status}"
+                stage ('Quality gate'){
+                    steps{
+                        timeout(time: 30, unit: 'SECONDS'){
+                            script{
+                                def qg = waitForQualityGate()
+                                if(qg.status != 'OK'){
+                                   error "La puerta de calidad no pasó: ${qg.status}"
+                                }
                             }
                         }
-                    }
+                   }
                 }
             }
+            
         }
         stage('Etapa de empaquetado y delivery'){
           steps{
