@@ -143,7 +143,7 @@ pipeline {
       }
     }
 
-      stage('Deploy to Kubernetes') {
+  stage('Deploy to Kubernetes') {
   steps {
     script {
       withCredentials([
@@ -156,53 +156,56 @@ pipeline {
           NS="${K8S_NAMESPACE}"
           DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
 
-          # Prepara kubeconfig dentro del workspace
+          # kubeconfig dentro del workspace
           mkdir -p "$WORKSPACE/.kube"
           cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
           chmod 600 "$WORKSPACE/.kube/config"
 
-          # Aliases de kubectl en contenedor (siempre como root y con kubeconfig montado)
+          # kubectl en contenedor (siempre root; kubeconfig montado)
           KBASE="docker run --rm --user=0:0 -e HOME=/root -e KUBECONFIG=/root/.kube/config -v $WORKSPACE/.kube:/root/.kube:ro"
           KC="$KBASE bitnami/kubectl:latest"
           KCW="$KBASE -v $WORKSPACE:/work -w /work bitnami/kubectl:latest"
 
-          # 1) Crear/actualizar imagePullSecret (SIN pipes): primero genero YAML en el host, luego lo aplico
+          # ====== FIX CLAVE: valor por defecto si NEXUS_REGISTRY no viene del entorno ======
+          REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
+          echo "Usando registry para imagePullSecret: $REG_SERVER"
+
+          echo "==> Creando/actualizando imagePullSecret nexus-docker"
           SECRET_YAML="$WORKSPACE/.dockersecret.yaml"
           $KC -n "$NS" create secret docker-registry nexus-docker \
-            --docker-server="${NEXUS_REGISTRY}" \
-            --docker-username="${REG_USER}" \
-            --docker-password="${REG_PASS}" \
-            --docker-email="noreply@local" \
-            --dry-run=client -o yaml > "$SECRET_YAML"
+              --docker-server="$REG_SERVER" \
+              --docker-username="${REG_USER}" \
+              --docker-password="${REG_PASS}" \
+              --docker-email="noreply@local" \
+              --dry-run=client -o yaml > "$SECRET_YAML"
 
-          # Aplica el secret montando el workspace (el contenedor lo verá como /work/.dockersecret.yaml)
+          # Aplica el secret (desde /work dentro del contenedor)
           $KCW -n "$NS" apply -f "/work/.dockersecret.yaml"
 
-          # 2) Aplica manifiesto K8s
+          # Aplica manifiesto
           [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
           echo "==> Aplicando manifiesto: $DF"
           $KCW -n "$NS" apply -f "$DF"
 
-          # 3) Ajusta la imagen al tag del build
+          # Ajusta imagen al build actual
           echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
           $KC -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
-          # 4) Espera rollout
+          # Rollout y verificación
           $KC -n "$NS" rollout status deployment/backend-test --timeout=180s
-
-          # 5) Verificación rápida
           DR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
           AR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
           echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
           test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-          # 6) Diagnóstico
+          # Diagnóstico
           $KC -n "$NS" get pods -l app=backend-test -o wide
         '''
       }
     }
   }
 }
+
 
     
 
