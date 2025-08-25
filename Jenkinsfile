@@ -149,7 +149,7 @@ stage('Deploy to Kubernetes') {
           KUB="docker run --rm --user=0:0 $KMNT bitnami/kubectl:latest $KCFG"
 
           # Preflight (detecta problemas reales del cluster ¡antes! de aplicar)
-          $KUB version --short || true
+          $KUB version --client || true
           $KUB cluster-info
 
           # --- imagePullSecret: generar YAML en el HOST y luego aplicar (sin pipes entre contenedores) ---
