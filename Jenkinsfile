@@ -136,76 +136,66 @@ pipeline {
             sh '''
               set -eux
               NS="${K8S_NAMESPACE}"
-              KCONF="$KUBECONFIG_FILE"
               DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
 
               [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-              # Detecta si KCONF es archivo o directorio
-              if [ -f "$KCONF" ]; then
-                echo "Kubeconfig es un archivo: $KCONF"
-                KENV="-e KUBECONFIG=/kubeconfig"
-                KMOUNT="-v $KCONF:/kubeconfig:ro"
+              # --- Preparar kubeconfig efectivo en un ARCHIVO del workspace ---
+              WORK_KCONF="$PWD/.kubeconfig"
+              SRC="$KUBECONFIG_FILE"
 
-                # Apply (por stdin, evita montar workspace)
-                cat "$DF" | docker run --rm -i --network devnet \
-                  $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" apply -f -
-
-                # set image
-                docker run --rm --network devnet $KENV $KMOUNT \
-                  bitnami/kubectl:latest -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
-
-                # rollout
-                docker run --rm --network devnet $KENV $KMOUNT \
-                  bitnami/kubectl:latest -n "$NS" rollout status deployment/backend-test --timeout=180s
-
-                # verificación
-                DR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-                AR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
-                echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
-                test -n "$DR" && [ "${AR:-0}" = "$DR" ]
-
-                docker run --rm --network devnet $KENV $KMOUNT \
-                  bitnami/kubectl:latest -n "$NS" get pods -l app=backend-test -o wide
-
-              elif [ -d "$KCONF" ]; then
-                echo "Kubeconfig es un directorio: $KCONF"
-                # Usa 'config' si existe; si no, el primer .yaml/.yml
-                if [ -f "$KCONF/config" ]; then
-                  KFILE="config"
+              # Si la credencial es archivo -> copiar directo
+              if [ -f "$SRC" ]; then
+                cp "$SRC" "$WORK_KCONF"
+              # Si por alguna razón la credencial es un directorio -> buscar 'config' o *.yaml
+              elif [ -d "$SRC" ]; then
+                if [ -f "$SRC/config" ]; then
+                  cp "$SRC/config" "$WORK_KCONF"
                 else
-                  KFILE="$(ls -1 "$KCONF" | grep -E '(^config$|\\.ya?ml$)' | head -n1 || true)"
-                  [ -n "$KFILE" ] || { echo "No se encontró archivo kubeconfig dentro de $KCONF"; exit 2; }
+                  KF="$(find "$SRC" -maxdepth 1 -type f \\( -name config -o -name '*.yml' -o -name '*.yaml' \\) | head -n1 || true)"
+                  [ -n "$KF" ] || { echo "No se encontró archivo kubeconfig dentro de $SRC"; exit 2; }
+                  cp "$KF" "$WORK_KCONF"
                 fi
-                echo "Usando kubeconfig: $KCONF/$KFILE"
-                KENV="-e KUBECONFIG=/kube/$KFILE"
-                KMOUNT="-v $KCONF:/kube:ro"
-
-                cat "$DF" | docker run --rm -i --network devnet \
-                  $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" apply -f -
-
-                docker run --rm --network devnet $KENV $KMOUNT \
-                  bitnami/kubectl:latest -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
-
-                docker run --rm --network devnet $KENV $KMOUNT \
-                  bitnami/kubectl:latest -n "$NS" rollout status deployment/backend-test --timeout=180s
-
-                DR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-                AR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
-                echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
-                test -n "$DR" && [ "${AR:-0}" = "$DR" ]
-
-                docker run --rm --network devnet $KENV $KMOUNT \
-                  bitnami/kubectl:latest -n "$NS" get pods -l app=backend-test -o wide
               else
-                echo "Ruta KUBECONFIG inválida: $KCONF"
+                echo "Ruta KUBECONFIG inválida: $SRC"
                 exit 2
               fi
+              chmod 600 "$WORK_KCONF"
+
+              # Debug: ver a qué server apunta
+              SERVER=$(awk '/server:/ {print $2; exit}' "$WORK_KCONF" || true)
+              echo "Kubeconfig server (efectivo): ${SERVER:-<no-detectado>}"
+
+              # --- kubectl: siempre montamos EL ARCHIVO como /kube/config ---
+              KENV="-e KUBECONFIG=/kube/config"
+              KMOUNT="-v $WORK_KCONF:/kube/config:ro"
+
+              # Apply del manifiesto (stdin)
+              cat "$DF" | docker run --rm -i --network devnet $KENV $KMOUNT \
+                bitnami/kubectl:latest -n "$NS" apply -f -
+
+              # set image a la última build
+              docker run --rm --network devnet $KENV $KMOUNT \
+                bitnami/kubectl:latest -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
+
+              # esperar rollout
+              docker run --rm --network devnet $KENV $KMOUNT \
+                bitnami/kubectl:latest -n "$NS" rollout status deployment/backend-test --timeout=180s
+
+              # verificación: disponibles == deseadas
+              DR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+              AR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+              echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
+              test -n "$DR" && [ "${AR:-0}" = "$DR" ]
+
+              docker run --rm --network devnet $KENV $KMOUNT \
+                bitnami/kubectl:latest -n "$NS" get pods -l app=backend-test -o wide
             '''
           }
         }
       }
     }
+
   }  
 
   post {
