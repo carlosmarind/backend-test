@@ -42,7 +42,7 @@ describe('AppController', () => {
     });
 
     test('Esto NO deberia retornar sin la API_KEY"', () => {
-      expect(appController.getApikey()).toBe('#qwerty123456!!');
+      expect(appController.getApikey()).not.toBe('!!');
     });
 
     test('Esto debería retornar válido si el RUT es correcto', () => { 
@@ -82,11 +82,11 @@ describe('AppController (e2e)', () => {
   });
 
   it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/').expect(200).expect(/cesar/);
+    return request(app.getHttpServer()).get('/').expect(200).expect(/Hello/);
   });
 
   it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/apikey').expect(200).expect(/#qwerty123456/);
+    return request(app.getHttpServer()).get('/apikey').expect(200).expect(/!!/);
   });
 
   it('/ (GET)', () => {

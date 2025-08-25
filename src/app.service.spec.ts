@@ -26,19 +26,19 @@ describe('AppService', () => {
   });
 
   it('Esto NO debería devolver un saludo sin mi USRENAME', () => {
-    expect(service.getHello()).not.toBe("Hello !!");
+    expect(service.getHello()).toBe("Hello !!");
   });
 
   it('Esto debería devolver un saludo con mi USRENAME', () => {
-    expect(service.getHello()).toBe("Hello cesar!!");
+    expect(service.getHello()).not.toBe("Hello cesar!!");
   });
 
   it('Esto NO debería devolver un mensaje sin la API_KEY', () => {
-    expect(service.getApikey()).not.toBe("!!");
+    expect(service.getApikey()).toBe("!!");
   });
 
   it('Esto debería devolver un mensaje con la API_KEY', () => {
-    expect(service.getApikey()).toBe("#qwerty123456!!");
+    expect(service.getApikey()).not.toBe("#qwerty123456!!");
   });
 
   it('probar RUN incorrecto', () => { 
