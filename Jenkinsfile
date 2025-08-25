@@ -120,84 +120,74 @@ pipeline {
         }
       }
     }
-stage('Deploy to Kubernetes') {
+
+    
+  stage('Docker Build & Push (Nexus)') {
   steps {
     script {
-      withCredentials([
-        file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
-        usernamePassword(credentialsId: 'nexus-credentials',
-          usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
-      ]) {
-        sh '''
-          set -euxo pipefail
+      // *** Fuerza que el contenedor "inside" conozca host.docker.internal ***
+      def insideArgs = '--add-host=host.docker.internal:host-gateway ' +
+                       '-v /var/run/docker.sock:/var/run/docker.sock ' +
+                       '--network devnet'
 
-          NS="${K8S_NAMESPACE}"
-          DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
-          [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
+      docker.image(env.IMAGE_TOOLING).inside(insideArgs) {
+        withCredentials([usernamePassword(credentialsId: 'nexus-credentials',
+          usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+          sh '''
+            set -eux
 
-          # --- kubeconfig: ya es un ARCHIVO (Secret file) ---
-          cp -f "$KUBECONFIG_FILE" "$WORKSPACE/kubeconfig.yaml"
-          chmod 600 "$WORKSPACE/kubeconfig.yaml"
+            REG="${NEXUS_REGISTRY}"   # ej: host.docker.internal:8082
 
-          # Verificar que el archivo existe y tiene contenido
-          [ -s "$WORKSPACE/kubeconfig.yaml" ] || { echo "kubeconfig.yaml está vacío o no existe"; exit 2; }
-          echo "=== Primeras líneas del kubeconfig ==="
-          head -n 5 "$WORKSPACE/kubeconfig.yaml"
+            echo "==> Preflight al registry ${REG}"
+            # 1) Chequeo TCP rápido (si falla, no sirve reintentar login)
+            (exec 3<>/dev/tcp/host.docker.internal/8082) || {
+              echo "ERROR: No hay conectividad TCP a ${REG} desde esta red (devnet)."
+              echo "Sugerencia: verifica que Nexus esté corriendo y que este contenedor tenga ruta al host."
+              exit 2
+            }
+            exec 3>&-
 
-          # --- alias para kubectl ---
-          KUB="docker run --rm --user=0:0 \
-               -v $WORKSPACE:/work:ro \
-               bitnami/kubectl:latest \
-               --kubeconfig=/work/kubeconfig.yaml"
+            # 2) Chequeo HTTP al endpoint /v2/ (propio de Docker Registry en Nexus)
+            docker run --rm --network devnet --add-host=host.docker.internal:host-gateway \
+              curlimages/curl:8.8.0 -sS -m 8 -I http://host.docker.internal:8082/v2/ || {
+                echo "ADVERTENCIA: /v2/ no respondió como se esperaba; intentaré login de todos modos."
+              }
 
-          # --- Verificar conexión a Kubernetes ---
-          echo "=== Verificando versión de kubectl ==="
-          $KUB version --client
-          
-          echo "=== Verificando conexión al cluster ==="
-          $KUB cluster-info
+            # 3) Login con reintentos (no usar esquema http://, deja que el daemon use HTTP por ser 'insecure-registries')
+            for i in 1 2 3; do
+              echo "$NEXUS_PASS" | docker login -u "$NEXUS_USER" --password-stdin "${REG}" && break || {
+                echo "Login falló (${i}/3). Esperando y reintentando..."
+                sleep 3
+              }
+              if [ "$i" = "3" ]; then
+                echo "ERROR: docker login a ${REG} falló 3 veces."
+                exit 2
+              fi
+            done
 
-          # --- Crear/actualizar imagePullSecret ---
-          REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
-          echo "=== Creando secret de Docker registry ==="
-          $KUB -n "$NS" create secret docker-registry nexus-docker \
-            --docker-server="$REG_SERVER" \
-            --docker-username="$REG_USER" \
-            --docker-password="$REG_PASS" \
-            --docker-email="noreply@local" \
-            --dry-run=client -o yaml | $KUB -n "$NS" apply -f -
+            # 4) Build & tag
+            docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest .
 
-          # --- Aplicar manifiesto de la aplicación ---
-          echo "=== Aplicando manifiesto: $DF ==="
-          $KUB -n "$NS" apply -f /work/"$DF"
+            # 5) Push con reintentos y backoff corto (maneja EOF/timeout intermitentes)
+            for i in 1 2 3; do
+              docker push ${IMAGE_NAME}:${BUILD_NUMBER} && break || {
+                echo "Push ${BUILD_NUMBER} falló (${i}/3). Reintentando..."
+                sleep 4
+              }
+              [ "$i" = "3" ] && { echo "ERROR: push ${BUILD_NUMBER} falló 3 veces"; exit 2; }
+            done
 
-          # --- Actualizar la imagen del deployment ---
-          echo "=== Actualizando imagen a ${IMAGE_NAME}:${BUILD_NUMBER} ==="
-          $KUB -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
+            for i in 1 2 3; do
+              docker push ${IMAGE_NAME}:latest && break || {
+                echo "Push latest falló (${i}/3). Reintentando..."
+                sleep 4
+              }
+              [ "$i" = "3" ] && { echo "ERROR: push latest falló 3 veces"; exit 2; }
+            done
 
-          # --- Esperar por el rollout ---
-          echo "=== Esperando por el rollout ==="
-          $KUB -n "$NS" rollout status deployment/backend-test --timeout=180s
-
-          # --- Verificar estado final ---
-          echo "=== Estado final del deployment ==="
-          $KUB -n "$NS" get deployment backend-test -o wide
-          
-          echo "=== Pods en ejecución ==="
-          $KUB -n "$NS" get pods -l app=backend-test -o wide
-
-          # --- Verificación adicional ---
-          DR=$($KUB -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-          AR=$($KUB -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
-          echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
-          
-          if [ -n "$DR" ] && [ "${AR:-0}" -eq "$DR" ]; then
-            echo "✅ Despliegue exitoso - Todas las réplicas están disponibles"
-          else
-            echo "❌ Problema con el despliegue - Réplicas disponibles: ${AR:-0}/$DR"
-            exit 1
-          fi
-        '''
+            docker image prune -f || true
+          '''
+        }
       }
     }
   }
