@@ -62,8 +62,16 @@ pipeline {
             withSonarQubeEnv(SONARQUBE_SERVER) {
               withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
                 sh '''
+                  set -e
+                  # Usa el valor del env o 'backend-test' como respaldo
+                  PK="${SONAR_PROJECT_KEY:-backend-test}"
+
+                  # (opcional) verifica que no esté vacío
+                  [ -n "$PK" ] || { echo "ERROR: SONAR_PROJECT_KEY vacío"; exit 2; }
+
                   sonar-scanner \
-                    -Dsonar.projectKey='"${SONAR_PROJECT_KEY}"' \
+                    -Dsonar.projectKey=$PK \
+                    -Dsonar.projectName=$PK \
                     -Dsonar.sources=src \
                     -Dsonar.tests=src \
                     -Dsonar.test.inclusions=**/*.spec.ts \
@@ -71,15 +79,15 @@ pipeline {
                     -Dsonar.exclusions=node_modules/**,dist/** \
                     -Dsonar.coverage.exclusions=**/*.spec.ts \
                     -Dsonar.host.url=http://sonarqube:9000 \
-                    -Dsonar.login="$SONAR_TOKEN"
+                    -Dsonar.login=$SONAR_TOKEN
                 '''
-
               }
             }
           }
         }
       }
     }
+
 
     stage('Quality Gate') {
       steps {
