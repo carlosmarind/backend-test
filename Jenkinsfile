@@ -16,16 +16,24 @@ pipeline {
 
     stage('Install & Test') {
       steps {
-        // si Node no está en PATH, usa el NodeJS tool:
-        // withEnv(["PATH+NODE=${tool 'nodejs-20'}/bin"]) { ... }
-        powershell 'npm ci; npm test -- --coverage'
+        powershell "npm ci; npm test -- --coverage"
       }
     }
 
     stage('Sonar') {
       steps {
         withSonarQubeEnv('sonarqube') {
-          powershell '& "$env:SCANNER_HOME\\bin\\sonar-scanner.bat"'
+          powershell '''
+            & "$env:SCANNER_HOME\\bin\\sonar-scanner.bat" `
+              -Dsonar.projectKey=backend-test `
+              -Dsonar.projectName=backend-test `
+              -Dsonar.sourceEncoding=UTF-8 `
+              -Dsonar.sources=src `
+              -Dsonar.tests=src `
+              -Dsonar.test.inclusions="**/*.spec.ts,**/*.test.ts" `
+              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info `
+              -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
+          '''
         }
       }
     }
