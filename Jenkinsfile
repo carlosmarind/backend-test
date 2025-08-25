@@ -140,14 +140,12 @@ pipeline {
 
               [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-              # --- Preparar kubeconfig efectivo en un ARCHIVO del workspace ---
+              # 1) Forzar kubeconfig a un ARCHIVO local del workspace
               WORK_KCONF="$PWD/.kubeconfig"
               SRC="$KUBECONFIG_FILE"
 
-              # Si la credencial es archivo -> copiar directo
               if [ -f "$SRC" ]; then
                 cp "$SRC" "$WORK_KCONF"
-              # Si por alguna razón la credencial es un directorio -> buscar 'config' o *.yaml
               elif [ -d "$SRC" ]; then
                 if [ -f "$SRC/config" ]; then
                   cp "$SRC/config" "$WORK_KCONF"
@@ -157,32 +155,31 @@ pipeline {
                   cp "$KF" "$WORK_KCONF"
                 fi
               else
-                echo "Ruta KUBECONFIG inválida: $SRC"
-                exit 2
+                echo "Ruta KUBECONFIG inválida: $SRC"; exit 2
               fi
               chmod 600 "$WORK_KCONF"
 
-              # Debug: ver a qué server apunta
+              # Info útil
               SERVER=$(awk '/server:/ {print $2; exit}' "$WORK_KCONF" || true)
               echo "Kubeconfig server (efectivo): ${SERVER:-<no-detectado>}"
 
-              # --- kubectl: siempre montamos EL ARCHIVO como /kube/config ---
-              KENV="-e KUBECONFIG=/kube/config"
-              KMOUNT="-v $WORK_KCONF:/kube/config:ro"
+              # 2) SIEMPRE montar como archivo en /kubeconfig (no /kube/config)
+              KENV="-e KUBECONFIG=/kubeconfig"
+              KMOUNT="-v $WORK_KCONF:/kubeconfig:ro"
 
-              # Apply del manifiesto (stdin)
+              # 3) Apply del manifiesto por stdin
               cat "$DF" | docker run --rm -i --network devnet $KENV $KMOUNT \
                 bitnami/kubectl:latest -n "$NS" apply -f -
 
-              # set image a la última build
+              # 4) Actualizar imagen al :latest que empujó el pipeline
               docker run --rm --network devnet $KENV $KMOUNT \
                 bitnami/kubectl:latest -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
 
-              # esperar rollout
+              # 5) Esperar rollout
               docker run --rm --network devnet $KENV $KMOUNT \
                 bitnami/kubectl:latest -n "$NS" rollout status deployment/backend-test --timeout=180s
 
-              # verificación: disponibles == deseadas
+              # 6) Verificación: disponibles == deseadas
               DR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
               AR=$(docker run --rm --network devnet $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
               echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
@@ -195,6 +192,7 @@ pipeline {
         }
       }
     }
+
 
   }  
 
