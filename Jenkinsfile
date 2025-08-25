@@ -121,14 +121,13 @@ pipeline {
       }
     }
 
-    stage('Deploy to Kubernetes') {
+  stage('Deploy to Kubernetes') {
   steps {
     script {
       withCredentials([
         file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
         usernamePassword(credentialsId: 'nexus-credentials',
-          usernameVariable: 'REG_USER',
-          passwordVariable: 'REG_PASS')
+          usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
       ]) {
         sh '''
           set -eux
@@ -137,22 +136,21 @@ pipeline {
           DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
           [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # 1) Prepara kubeconfig (SOLO LECTURA) en un path estándar
+          # kubeconfig de solo lectura
           mkdir -p "$WORKSPACE/.kube"
           cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
           chmod 600 "$WORKSPACE/.kube/config"
 
-          # 2) Alias para invocar kubectl en contenedor (sin montar workspace)
-          KBASE="docker run --rm --user=0:0 \
+          # Alias para kubectl: OJO con -i para leer STDIN en apply -f -
+          KBASE="docker run --rm -i --user=0:0 \
                  -e HOME=/root -e KUBECONFIG=/root/.kube/config \
                  -v $WORKSPACE/.kube:/root/.kube:ro"
           KC="$KBASE bitnami/kubectl:latest"
 
-          # 3) ImagePullSecret (TODO por pipe; sin archivos)
+          # 1) imagePullSecret por STDIN (sin archivos en disco)
           REG_SERVER="${NEXUS_REGISTRY}"
           echo "Usando registry para imagePullSecret: $REG_SERVER"
 
-          # Captura el YAML del secret y aplícalo por STDIN
           SECRET_YAML="$($KC -n "$NS" create secret docker-registry nexus-docker \
                            --docker-server="$REG_SERVER" \
                            --docker-username="$REG_USER" \
@@ -163,7 +161,7 @@ pipeline {
           if [ -n "$SECRET_YAML" ]; then
             printf "%s" "$SECRET_YAML" | $KC -n "$NS" apply -f -
           else
-            echo "WARN: kubectl no produjo YAML del secret (intentando create/apply directos)"
+            echo "WARN: kubectl no produjo YAML; fallback a create directo"
             $KC -n "$NS" delete secret nexus-docker --ignore-not-found
             $KC -n "$NS" create secret docker-registry nexus-docker \
                 --docker-server="$REG_SERVER" \
@@ -172,23 +170,23 @@ pipeline {
                 --docker-email="noreply@local"
           fi
 
-          # 4) Aplica el manifiesto de la app por STDIN (sin montar workspace)
+          # 2) Manifiesto de la app por STDIN (sin montar workspace)
           echo "==> Aplicando manifiesto: $DF"
           cat "$DF" | $KC -n "$NS" apply -f -
 
-          # 5) Fuerza la imagen exacta del build
+          # 3) Forzar imagen exacta
           echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
           $KC -n "$NS" set image deployment/backend-test \
               backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
-          # 6) Espera rollout y valida réplicas
+          # 4) Rollout y validación
           $KC -n "$NS" rollout status deployment/backend-test --timeout=180s
           DR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
           AR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
           echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
           test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-          # 7) Diagnóstico final útil
+          # 5) Diagnóstico
           $KC -n "$NS" get pods -l app=backend-test -o wide
         '''
       }
