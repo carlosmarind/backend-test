@@ -5,11 +5,11 @@ pipeline {
     IMAGE_TOOLING      = 'edgardobenavidesl/node-java-sonar-docker:latest'
     SONARQUBE_SERVER   = 'SonarQube'                     // nombre en Jenkins Global Config
     SONAR_PROJECT_KEY  = 'backend-test'
-    NEXUS_REGISTRY     = 'localhost:8082'                // ⚠️ usa host/IP alcanzable por los nodos K8s
+    NEXUS_REGISTRY     = 'localhost:8082'                // ⚠️ usa host/IP alcanzable por los nodos K8s (no "localhost")
     IMAGE_NAME         = "${NEXUS_REGISTRY}/backend-test"
     BUILD_TAG          = "${env.BUILD_NUMBER}"
     MAX_IMAGES_TO_KEEP = '5'
-    K8S_NAMESPACE      = 'default'                       // ajusta si usas otro namespace
+    K8S_NAMESPACE      = 'default'
   }
 
   options { timeout(time: 45, unit: 'MINUTES') }
@@ -23,7 +23,10 @@ pipeline {
       steps {
         script {
           docker.image(env.IMAGE_TOOLING).inside('-v /var/run/docker.sock:/var/run/docker.sock --network devnet') {
-            sh 'npm ci'
+            sh '''
+              set -eux
+              npm ci
+            '''
           }
         }
       }
@@ -37,8 +40,8 @@ pipeline {
               set -eux
               npm run test:cov
               # Normaliza rutas de lcov para Sonar
-              sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info
-              sed -i 's#\\\\#/#g' coverage/lcov.info
+              sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info || true
+              sed -i 's#\\\\#/#g' coverage/lcov.info || true
             '''
           }
         }
@@ -49,7 +52,10 @@ pipeline {
       steps {
         script {
           docker.image(env.IMAGE_TOOLING).inside('-v /var/run/docker.sock:/var/run/docker.sock --network devnet') {
-            sh 'npm run build'
+            sh '''
+              set -eux
+              npm run build
+            '''
           }
         }
       }
@@ -62,11 +68,8 @@ pipeline {
             withSonarQubeEnv(SONARQUBE_SERVER) {
               withCredentials([string(credentialsId: 'sonarqube-cred', variable: 'SONAR_TOKEN')]) {
                 sh '''
-                  set -e
-                  # Usa el valor del env o 'backend-test' como respaldo
+                  set -eux
                   PK="${SONAR_PROJECT_KEY:-backend-test}"
-
-                  # (opcional) verifica que no esté vacío
                   [ -n "$PK" ] || { echo "ERROR: SONAR_PROJECT_KEY vacío"; exit 2; }
 
                   sonar-scanner \
@@ -79,7 +82,7 @@ pipeline {
                     -Dsonar.exclusions=node_modules/**,dist/** \
                     -Dsonar.coverage.exclusions=**/*.spec.ts \
                     -Dsonar.host.url=http://sonarqube:9000 \
-                    -Dsonar.login=$SONAR_TOKEN
+                    -Dsonar.login="$SONAR_TOKEN"
                 '''
               }
             }
@@ -87,7 +90,6 @@ pipeline {
         }
       }
     }
-
 
     stage('Quality Gate') {
       steps {
@@ -104,6 +106,7 @@ pipeline {
       steps {
         script {
           docker.image(env.IMAGE_TOOLING).inside('-v /var/run/docker.sock:/var/run/docker.sock --network devnet') {
+            // Asegúrate que 'nexus-credentials' sea de tipo "Username with password"
             withCredentials([usernamePassword(credentialsId: 'nexus-credentials',
               usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
               sh '''
@@ -114,7 +117,7 @@ pipeline {
                 docker push ${IMAGE_NAME}:${BUILD_NUMBER}
                 docker push ${IMAGE_NAME}:latest
 
-                docker image prune -f
+                docker image prune -f || true
               '''
             }
           }
@@ -126,15 +129,47 @@ pipeline {
       steps {
         script {
           withCredentials([
-            file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')   
+            file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE')
           ]) {
-                stage('Deploy to Kubernetes') {
+            sh '''
+              set -eux
+              NS="${K8S_NAMESPACE}"
+              KCONF="$KUBECONFIG_FILE"
 
+              # Aplica manifiesto (monta workspace)
+              docker run --rm --network devnet \
+                -v "$KCONF:/root/.kube/config:ro" \
+                -v "$PWD:/work" -w /work \
+                bitnami/kubectl:latest \
+                kubectl -n "$NS" apply -f kubernetes.yaml
+
+              # Fuerza actualización a la última imagen
+              docker run --rm --network devnet \
+                -v "$KCONF:/root/.kube/config:ro" \
+                bitnami/kubectl:latest \
+                kubectl -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
+
+              # Espera rollout
+              docker run --rm --network devnet \
+                -v "$KCONF:/root/.kube/config:ro" \
+                bitnami/kubectl:latest \
+                kubectl -n "$NS" rollout status deployment/backend-test --timeout=180s
+
+              # Verificación: disponibles == deseadas
+              DR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" bitnami/kubectl:latest kubectl -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+              AR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" bitnami/kubectl:latest kubectl -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+              echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
+              test -n "$DR" && [ "${AR:-0}" = "$DR" ]
+
+              docker run --rm --network devnet \
+                -v "$KCONF:/root/.kube/config:ro" \
+                bitnami/kubectl:latest \
+                kubectl -n "$NS" get pods -l app=backend-test -o wide
+            '''
           }
         }
       }
     }
-
   }
 
   post {
