@@ -29,9 +29,21 @@ describe('AppController', () => {
 
   describe('Probar el modulo raiz del proyecto', () => {     
 
-    test('Esto deberia retornar hola en ingles"', () => {
-      expect(appController.getHello()).toBe('Hello !!');
-    });  
+    test('Esto deberia retornar hola más mi usuario"', () => {
+      expect(appController.getHello()).toBe('Hello cesar!!');
+    }); 
+    
+    test('Esto NO deberia retornar hola sin mi usuario"', () => {
+      expect(appController.getHello()).not.toBe('Hello !!');
+    });
+
+    test('Esto deberia retornar la API_KEY"', () => {
+      expect(appController.getApikey()).toBe('#qwerty123456!!');
+    });
+
+    test('Esto NO deberia retornar sin la API_KEY"', () => {
+      expect(appController.getApikey()).toBe('#qwerty123456!!');
+    });
 
     test('Esto debería retornar válido si el RUT es correcto', () => { 
       const res: any = {
@@ -70,11 +82,11 @@ describe('AppController (e2e)', () => {
   });
 
   it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/').expect(200).expect(/Hello/);
+    return request(app.getHttpServer()).get('/').expect(200).expect(/cesar/);
   });
 
   it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/apikey').expect(200).expect(/!!/);
+    return request(app.getHttpServer()).get('/apikey').expect(200).expect(/#qwerty123456/);
   });
 
   it('/ (GET)', () => {

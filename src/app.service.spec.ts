@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppService } from './app.service'; 
 import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration'; 
+import { notDeepEqual } from 'assert';
 
 describe('AppService', () => {
   let service: AppService;
@@ -22,6 +23,22 @@ describe('AppService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('Esto NO debería devolver un saludo sin mi USRENAME', () => {
+    expect(service.getHello()).not.toBe("Hello !!");
+  });
+
+  it('Esto debería devolver un saludo con mi USRENAME', () => {
+    expect(service.getHello()).toBe("Hello cesar!!");
+  });
+
+  it('Esto NO debería devolver un mensaje sin la API_KEY', () => {
+    expect(service.getApikey()).not.toBe("!!");
+  });
+
+  it('Esto debería devolver un mensaje con la API_KEY', () => {
+    expect(service.getApikey()).toBe("#qwerty123456!!");
   });
 
   it('probar RUN incorrecto', () => { 
