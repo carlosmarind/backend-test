@@ -134,67 +134,72 @@ pipeline {
     }
 
     stage('Deploy to Kubernetes') {
-      steps {
-        script {
-          withCredentials([
-            file(credentialsId: 'kubeconfig',       variable: 'KUBECONFIG_FILE'),
-            usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
-          ]) {
-            sh '''
-              set -eux
-              NS="${K8S_NAMESPACE}"
-              DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
-              [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
+  steps {
+    script {
+      withCredentials([
+        file(credentialsId: 'kubeconfig',       variable: 'KUBECONFIG_FILE'),
+        usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
+      ]) {
+        sh '''
+          set -eux
+          NS="${K8S_NAMESPACE}"
+          DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
+          [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-              # 1) Asegurar kubeconfig como ARCHIVO y montarlo como /kubeconfig (no /kube/config)
-              WORK_KCONF="$PWD/.kubeconfig"
-              SRC="$KUBECONFIG_FILE"
-              if [ -f "$SRC" ]; then
-                cp "$SRC" "$WORK_KCONF"
-              elif [ -d "$SRC" ] && [ -f "$SRC/config" ]; then
-                cp "$SRC/config" "$WORK_KCONF"
-              else
-                echo "Credencial kubeconfig inválida (no es archivo ni directorio con 'config')"; exit 2
-              fi
-              chmod 600 "$WORK_KCONF"
-              awk '/server:/ {print "Kubeconfig server:", $2; exit}' "$WORK_KCONF" || true
+          # 1) Preparar ~/.kube/config como DIRECTORIO (no archivo suelto)
+          #    - Creamos .kube/ en el workspace y copiamos ahí el kubeconfig como "config"
+          mkdir -p "$PWD/.kube"
+          SRC="$KUBECONFIG_FILE"
+          if [ -f "$SRC" ]; then
+            cp "$SRC" "$PWD/.kube/config"
+          elif [ -d "$SRC" ] && [ -f "$SRC/config" ]; then
+            cp "$SRC/config" "$PWD/.kube/config"
+          else
+            echo "Credencial kubeconfig inválida (no es archivo ni directorio con 'config')"; exit 2
+          fi
+          chmod 600 "$PWD/.kube/config"
+          awk '/server:/ {print "Kubeconfig server:", $2; exit}' "$PWD/.kube/config" || true
 
-              KENV="-e KUBECONFIG=/kubeconfig"
-              KMOUNT="-v $WORK_KCONF:/kubeconfig:ro"
+          # Montamos la CARPETA .kube al /root/.kube de la imagen
+          KMOUNT="-v $PWD/.kube:/root/.kube:ro"
 
-              # 2) Crear/actualizar imagePullSecret para Nexus (en una sola línea, sin pipes raros)
-              docker run --rm $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" create secret docker-registry nexus-docker \
-                --docker-server=${NEXUS_REGISTRY} \
-                --docker-username="$REG_USER" \
-                --docker-password="$REG_PASS" \
-                --docker-email="noreply@local" \
-                --dry-run=client -o yaml | \
-              docker run --rm -i $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" apply -f -
+          # 2) (debug rápido) Asegurar que kubectl puede LEER el kubeconfig
+          docker run --rm $KMOUNT bitnami/kubectl:latest config view --minify >/dev/null
 
-              # 3) Aplicar manifiesto montando el workspace y usando -f "$DF"
-              docker run --rm $KENV $KMOUNT -v "$PWD:/work" -w /work \
-                bitnami/kubectl:latest -n "$NS" apply -f "$DF"
+          # 3) Crear/actualizar imagePullSecret para Nexus
+          docker run --rm $KMOUNT bitnami/kubectl:latest -n "$NS" create secret docker-registry nexus-docker \
+            --docker-server=${NEXUS_REGISTRY} \
+            --docker-username="$REG_USER" \
+            --docker-password="$REG_PASS" \
+            --docker-email="noreply@local" \
+            --dry-run=client -o yaml | \
+          docker run --rm -i $KMOUNT bitnami/kubectl:latest -n "$NS" apply -f -
 
-              # 4) Forzar imagen exacta del build
-              docker run --rm $KENV $KMOUNT \
-                bitnami/kubectl:latest -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
+          # 4) Aplicar manifiesto montando el workspace y usando -f "$DF"
+          docker run --rm $KMOUNT -v "$PWD:/work" -w /work \
+            bitnami/kubectl:latest -n "$NS" apply -f "$DF"
 
-              # 5) Esperar rollout y verificar
-              docker run --rm $KENV $KMOUNT \
-                bitnami/kubectl:latest -n "$NS" rollout status deployment/backend-test --timeout=180s
+          # 5) Forzar imagen EXACTA del build
+          docker run --rm $KMOUNT \
+            bitnami/kubectl:latest -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
-              DR=$(docker run --rm $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-              AR=$(docker run --rm $KENV $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
-              echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
-              test -n "$DR" && [ "${AR:-0}" = "$DR" ]
+          # 6) Esperar rollout y verificar
+          docker run --rm $KMOUNT \
+            bitnami/kubectl:latest -n "$NS" rollout status deployment/backend-test --timeout=180s
 
-              docker run --rm $KENV $KMOUNT \
-                bitnami/kubectl:latest -n "$NS" get pods -l app=backend-test -o wide
-            '''
-          }
-        }
+          DR=$(docker run --rm $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+          AR=$(docker run --rm $KMOUNT bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+          echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
+          test -n "$DR" && [ "${AR:-0}" = "$DR" ]
+
+          docker run --rm $KMOUNT \
+            bitnami/kubectl:latest -n "$NS" get pods -l app=backend-test -o wide
+        '''
       }
     }
+  }
+}
+
 
   }
 
