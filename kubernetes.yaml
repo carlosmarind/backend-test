@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  USERNAME: "userkube"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+type: Opaque
+stringData:
+  API_KEY: "REEMPLAZA_CON_TU_API_KEY"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-test
+  template:
+    metadata:
+      labels:
+        app: backend-test
+    spec:
+      containers:
+        - name: backend-test
+          image: localhost:8082/backend-test:latest   # se actualizará desde el pipeline
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: USERNAME
+            # - name: API_KEY
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: app-secrets
+            #       key: API_KEY
+      imagePullSecrets: [] #        - name: nexus-docker         # Si tu Nexus requiere auth para pull, crea un secret docker y decláralo aquí
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-test
+spec:
+  type: ClusterIP
+  selector:
+    app: backend-test
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
