@@ -69,6 +69,17 @@ pipeline {
                 }
             }
         }
+        stage('Construcción de imagen docker & Upload de imagen') {
+            steps {
+                sh 'docker build -t backend-node-devops:cmd .'
+                sh "docker tag backend-node-devops:cmd localhost:8082/backend-node-devops:${BUILD_NUMBER}"
+                script {
+                    docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
+                        sh "docker push localhost:8082/backend-node-devops:${BUILD_NUMBER}"
+                    }
+                }
+            }
+        }                
 
     }
 }
