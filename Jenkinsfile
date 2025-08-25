@@ -44,15 +44,27 @@ pipeline{
                     }
                 } 
             }
+            stage ('Quality gate'){
+                steps{
+                    timeout(time: 30, unit: 'SECONDS'){
+                        script{
+                            def qg = waitForQualityGate()
+                            if(qg.status != 'OK'){
+                               error "La puerta de calidad no pasó: ${qg.status}"
+                            }
+                        }
+                    }
+                }
+            }
         }
         stage('Etapa de empaquetado y delivery'){
           steps{
             script{
-               docker.withRegistry('', 'f9e70e70-833b-4fbe-9635-7c57ea832e76'){ 
+               /*docker.withRegistry('', 'f9e70e70-833b-4fbe-9635-7c57ea832e76'){ 
                     sh 'docker build -t backend-test .'
                     sh 'docker tag backend-test dockermonges/backend-test:cma'
                     sh 'docker push dockermonges/backend-test:cma'
-                }
+                }*/
                 docker.withRegistry('http://localhost:8082', 'nexus-credencial'){  
                     sh 'docker tag backend-test:cma localhost:8082/cesar/backend-test:cma'
                     sh 'docker push localhost:8082/cesar/backend-test:cma'
