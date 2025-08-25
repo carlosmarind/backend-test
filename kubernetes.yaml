@@ -12,6 +12,7 @@ metadata:
   name: app-secrets
 type: Opaque
 stringData:
+  # (opcional) gestiona tus secretos de app aquí
   API_KEY: "REEMPLAZA_CON_TU_API_KEY"
 
 ---
@@ -29,9 +30,12 @@ spec:
       labels:
         app: backend-test
     spec:
+      imagePullSecrets:
+        - name: nexus-docker   # el Jenkinsfile lo crea/actualiza antes del apply
       containers:
         - name: backend-test
-          image: localhost:8082/backend-test:latest   # se actualizará desde el pipeline
+          # Imagen base; luego el pipeline la fuerza a :${BUILD_NUMBER}
+          image: host.docker.internal:8082/backend-test:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -46,7 +50,6 @@ spec:
             #     secretKeyRef:
             #       name: app-secrets
             #       key: API_KEY
-      imagePullSecrets: [] #        - name: nexus-docker         # Si tu Nexus requiere auth para pull, crea un secret docker y decláralo aquí
 
 ---
 apiVersion: v1
