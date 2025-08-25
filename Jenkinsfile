@@ -5,12 +5,12 @@ pipeline {
     IMAGE_TOOLING      = 'edgardobenavidesl/node-java-sonar-docker:latest'
     SONARQUBE_SERVER   = 'SonarQube'                     // nombre en Jenkins Global Config
     SONAR_PROJECT_KEY  = 'backend-test'
-    NEXUS_REGISTRY     = 'localhost:8082'                // ⚠️ usa host/IP alcanzable por los nodos K8s (no "localhost")
+    NEXUS_REGISTRY     = 'localhost:8082'                // ⚠️ desde K8s "localhost" NO sirve; usa IP/DNS accesible por los nodos
     IMAGE_NAME         = "${NEXUS_REGISTRY}/backend-test"
     BUILD_TAG          = "${env.BUILD_NUMBER}"
     MAX_IMAGES_TO_KEEP = '5'
     K8S_NAMESPACE      = 'default'
-    DEPLOYMENT_FILE = 'kubernetes.yaml'  
+    DEPLOYMENT_FILE    = 'kubernetes.yaml'               // ajusta si está en otra ruta (p.ej. k8s/kubernetes.yaml)
   }
 
   options { timeout(time: 45, unit: 'MINUTES') }
@@ -40,7 +40,7 @@ pipeline {
             sh '''
               set -eux
               npm run test:cov
-              # Normaliza rutas de lcov para Sonar
+              # Normaliza rutas de lcov para Sonar (tolerante a ausencia del archivo)
               sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info || true
               sed -i 's#\\\\#/#g' coverage/lcov.info || true
             '''
@@ -138,42 +138,55 @@ pipeline {
 
               [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-              # Aplica el manifiesto SIN montar el workspace (evita problemas de rutas)
+              # (Debug) Ver a qué server apunta el kubeconfig
+              SERVER=$(awk '/server:/ {print $2; exit}' "$KCONF" || true)
+              echo "Kubeconfig server: ${SERVER:-<no-detectado>}"
+
+              # Aplica el manifiesto pasando kubeconfig al contenedor por volumen + env
               cat "$DF" | docker run --rm -i --network devnet \
-                -v "$KCONF:/root/.kube/config:ro" \
+                -e KUBECONFIG=/kube/config \
+                -v "$KCONF:/kube/config:ro" \
                 bitnami/kubectl:latest \
                 -n "$NS" apply -f -
 
-              # Actualiza la imagen al último tag
-              docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" \
+              # Actualiza imagen al último tag
+              docker run --rm --network devnet \
+                -e KUBECONFIG=/kube/config \
+                -v "$KCONF:/kube/config:ro" \
                 bitnami/kubectl:latest \
                 -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:latest
 
               # Espera el rollout
-              docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" \
+              docker run --rm --network devnet \
+                -e KUBECONFIG=/kube/config \
+                -v "$KCONF:/kube/config:ro" \
                 bitnami/kubectl:latest \
                 -n "$NS" rollout status deployment/backend-test --timeout=180s
 
               # Verificación: disponibles == deseadas
-              DR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" \
-                    bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-              AR=$(docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" \
-                    bitnami/kubectl:latest -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+              DR=$(docker run --rm --network devnet \
+                    -e KUBECONFIG=/kube/config \
+                    -v "$KCONF:/kube/config:ro" \
+                    bitnami/kubectl:latest \
+                    -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+              AR=$(docker run --rm --network devnet \
+                    -e KUBECONFIG=/kube/config \
+                    -v "$KCONF:/kube/config:ro" \
+                    bitnami/kubectl:latest \
+                    -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
               echo "Desired replicas: ${DR:-?} | Available replicas: ${AR:-0}"
               test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-              docker run --rm --network devnet -v "$KCONF:/root/.kube/config:ro" \
-                bitnami/kubectl:latest -n "$NS" get pods -l app=backend-test -o wide
+              docker run --rm --network devnet \
+                -e KUBECONFIG=/kube/config \
+                -v "$KCONF:/kube/config:ro" \
+                bitnami/kubectl:latest \
+                -n "$NS" get pods -l app=backend-test -o wide
             '''
           }
         }
       }
-    
-
     }
-
-
-
   }
 
   post {
