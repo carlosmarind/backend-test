@@ -119,6 +119,7 @@ describe('AppController (e2e)', () => {
         ['division', -2, 2, -1, 'Prueba division -2/2 valida'],
         ['division', -2, -2, 1, 'Prueba division -2/(-2) valida']
     ])('Operaciones validas', async (operacion, a, b, expectedResult, descripcion) => {
+        console.log('Test params:', { operacion, a, b, expectedResult });//TODO borrar
         return request(app.getHttpServer())
             .get(`/operaciones?operacion=${operacion}&a=${a}&b=${b}`)
             .expect(200)
