@@ -12,7 +12,7 @@ metadata:
   name: app-secret
 type: Opaque
 data:
-
+  # echo -n "replace-with-your-api-key" | base64
   API_KEY: "cmVwbGFjZS13aXRoLXlvdXItYXBpLWtleQ=="
 
 ---
@@ -33,18 +33,18 @@ spec:
         app: backend-test
     spec:
       containers:
-      - name: backend-test
-        image: host.docker.internal:8083/backend-test:latest
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 3000
-        envFrom:
-        - configMapRef:
-            name: app-config
-        - secretRef:
-            name: app-secret
+        - name: backend-test
+          image: host.docker.internal:8083/backend-test:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret
       imagePullSecrets:
-      - name: nexus-docker-secret
+        - name: nexus-docker-secret
 
 ---
 apiVersion: v1
@@ -54,10 +54,11 @@ metadata:
   labels:
     app: backend-test
 spec:
+  type: NodePort
   selector:
     app: backend-test
   ports:
-  - name: http
-    port: 80
-    targetPort: 3000
-  type: ClusterIP
+    - name: http
+      port: 80
+      targetPort: 3000
+      nodePort: 30080

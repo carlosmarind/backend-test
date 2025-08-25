@@ -21,23 +21,25 @@ pipeline {
       }
     }
 
-    stage('Sonar') {
-      steps {
-        withSonarQubeEnv('sonarqube') {
-          powershell '''
-            & "$env:SCANNER_HOME\\bin\\sonar-scanner.bat" `
-              -D"sonar.projectKey=backend-test" `
-              -D"sonar.projectName=backend-test" `
-              -D"sonar.sourceEncoding=UTF-8" `
-              -D"sonar.sources=src" `
-              -D"sonar.tests=src" `
-              -D"sonar.test.inclusions=**/*.spec.ts,**/*.test.ts" `
-              -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" `
-              -D"sonar.typescript.lcov.reportPaths=coverage/lcov.info"
-          '''
-        }
+  stage('Sonar') {
+    tools { nodejs 'nodejs-18' }
+    steps {
+      withSonarQubeEnv('sonarqube') {
+        powershell '''
+          & "$env:SCANNER_HOME\\bin\\sonar-scanner.bat" `
+            -D"sonar.projectKey=backend-test" `
+            -D"sonar.projectName=backend-test" `
+            -D"sonar.sourceEncoding=UTF-8" `
+            -D"sonar.sources=src" `
+            -D"sonar.tests=src" `
+            -D"sonar.test.inclusions=**/*.spec.ts,**/*.test.ts" `
+            -D"sonar.javascript.lcov.reportPaths=coverage/lcov.info" `
+            -D"sonar.typescript.lcov.reportPaths=coverage/lcov.info"
+        '''
       }
     }
+  }
+
 
     stage('Quality Gate') {
       steps {
