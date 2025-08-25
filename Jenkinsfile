@@ -125,71 +125,78 @@ stage('Deploy to Kubernetes') {
     script {
       withCredentials([
         file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
-        usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
+        usernamePassword(credentialsId: 'nexus-credentials',
+          usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
       ]) {
         sh '''
-          set -eux
+          set -euxo pipefail
 
           NS="${K8S_NAMESPACE}"
           DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
           [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # --- KUBECONFIG: SIEMPRE archivo, y lo montamos como /work/kubeconfig.yaml ---
+          # --- kubeconfig: limpiar y normalizar a archivo ---
+          # si quedó una CARPETA con ese nombre por intentos previos, elimínala
+          [ -d "$WORKSPACE/kubeconfig.yaml" ] && rm -rf "$WORKSPACE/kubeconfig.yaml"
           rm -f "$WORKSPACE/kubeconfig.yaml" || true
-          cp "$KUBECONFIG_FILE" "$WORKSPACE/kubeconfig.yaml"
+
+          SRC="$KUBECONFIG_FILE"
+          if [ -d "$SRC" ]; then
+            # credencial entregada como directorio: elegir archivo válido
+            if   [ -f "$SRC/config" ]; then SRC="$SRC/config"
+            elif [ -f "$SRC/kubeconfig" ]; then SRC="$SRC/kubeconfig"
+            else
+              SRC="$(find "$KUBECONFIG_FILE" -maxdepth 1 -type f \\( -name '*.yml' -o -name '*.yaml' -o -name 'config' -o -name 'kubeconfig' \\) | head -n1 || true)"
+            fi
+          fi
+          [ -f "$SRC" ] || { echo "No se halló archivo kubeconfig dentro de la credencial"; exit 2; }
+
+          cp -f "$SRC" "$WORKSPACE/kubeconfig.yaml"
           chmod 600 "$WORKSPACE/kubeconfig.yaml"
-          [ -s "$WORKSPACE/kubeconfig.yaml" ] || { echo "kubeconfig vacío"; exit 2; }
+          echo "server en kubeconfig: $(awk \'/server:/ {print $2; exit}\' "$WORKSPACE/kubeconfig.yaml" || true)"
 
-          echo ">> kubeconfig (primeras líneas):"
-          head -n 5 "$WORKSPACE/kubeconfig.yaml" || true
+          # alias para kubectl (montamos workspace RW y fijamos kubeconfig explícito)
+          KUB="docker run --rm --user=0:0 \
+               -e HOME=/root -e KUBECONFIG=/work/kubeconfig.yaml \
+               -v $WORKSPACE:/work:rw \
+               bitnami/kubectl:1.30-debian-12 \
+               --kubeconfig=/work/kubeconfig.yaml"
 
-          # Atajos para kubectl dentro del contenedor
-          KMNT="-v $WORKSPACE:/work:ro"
-          KCFG="--kubeconfig=/work/kubeconfig.yaml"
-          KUB="docker run --rm --user=0:0 $KMNT bitnami/kubectl:latest $KCFG"
-
-          # Preflight (detecta problemas reales del cluster ¡antes! de aplicar)
-          $KUB version --client || true
-          $KUB cluster-info
-
-          # --- imagePullSecret: generar YAML en el HOST y luego aplicar (sin pipes entre contenedores) ---
+          # --- imagePullSecret: generar YAML en HOST y aplicar desde archivo ---
           REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
-          echo "Usando registry para imagePullSecret: $REG_SERVER"
-
-          # Genera el YAML del secret en el workspace del host
-          docker run --rm --user=0:0 $KMNT bitnami/kubectl:latest $KCFG -n "$NS" create secret docker-registry nexus-docker \
+          $KUB -n "$NS" create secret docker-registry nexus-docker \
             --docker-server="$REG_SERVER" \
             --docker-username="$REG_USER" \
             --docker-password="$REG_PASS" \
             --docker-email="noreply@local" \
             --dry-run=client -o yaml > "$WORKSPACE/.dockersecret.yaml"
 
-          ls -l "$WORKSPACE/.dockersecret.yaml"
-          head -n 3 "$WORKSPACE/.dockersecret.yaml" || true
+          [ -s "$WORKSPACE/.dockersecret.yaml" ] || { echo "Secret YAML vacío"; exit 2; }
 
-          # Aplica el secret y el manifiesto (siempre con --kubeconfig correcto)
           $KUB -n "$NS" apply --validate=false -f /work/.dockersecret.yaml
+
+          # --- manifiesto de la app ---
           echo "==> Aplicando manifiesto: $DF"
           $KUB -n "$NS" apply --validate=false -f /work/"$DF"
 
-          # Forzar la imagen exacta construida
+          # --- set image y rollout ---
           echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
           $KUB -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
-          # Rollout y validación de réplicas
           $KUB -n "$NS" rollout status deployment/backend-test --timeout=180s
+
           DR=$($KUB -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
           AR=$($KUB -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
           echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
           test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-          # Diagnóstico final
           $KUB -n "$NS" get pods -l app=backend-test -o wide
         '''
       }
     }
   }
 }
+
 
 
 
