@@ -2,29 +2,21 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_TOOLING        = 'edgardobenavidesl/node-java-sonar-docker:latest'
-
-    SONARQUBE_SERVER     = 'SonarQube'          // nombre en Jenkins Global Config
-    SONAR_PROJECT_KEY    = 'backend-test'
-
-    // Registries: push (host local) vs pull (desde los nodos K8s)
-    NEXUS_REGISTRY_PUSH  = 'localhost:8082'
-    NEXUS_REGISTRY_PULL  = 'host.docker.internal:8082'
-
-    IMAGE_NAME_PUSH      = "${NEXUS_REGISTRY_PUSH}/backend-test"
-    IMAGE_NAME_PULL      = "${NEXUS_REGISTRY_PULL}/backend-test"
-
-    BUILD_TAG            = "${env.BUILD_NUMBER}"
-    MAX_IMAGES_TO_KEEP   = '5'
-
-    K8S_NAMESPACE        = 'default'
-    DEPLOYMENT_FILE      = 'kubernetes.yaml'    // existe en el repo raíz
+    IMAGE_TOOLING      = 'edgardobenavidesl/node-java-sonar-docker:latest'
+    SONARQUBE_SERVER   = 'SonarQube'                     // nombre en Jenkins Global Config
+    SONAR_PROJECT_KEY  = 'backend-test'
+    // Usa SIEMPRE host.docker.internal:8082 (coincide con tu daemon inseguro)
+    NEXUS_REGISTRY     = 'host.docker.internal:8082'
+    IMAGE_NAME         = "${NEXUS_REGISTRY}/backend-test"
+    BUILD_TAG          = "${env.BUILD_NUMBER}"
+    MAX_IMAGES_TO_KEEP = '5'
+    K8S_NAMESPACE      = 'default'
+    DEPLOYMENT_FILE    = 'kubernetes.yaml'               // ajusta si está en otra ruta
   }
 
   options { timeout(time: 45, unit: 'MINUTES') }
 
   stages {
-
     stage('Checkout SCM') {
       steps { checkout scm }
     }
@@ -49,7 +41,7 @@ pipeline {
             sh '''
               set -eux
               npm run test:cov
-              # Normaliza rutas del lcov para Sonar (tolerante si no existe)
+              # Normaliza rutas de lcov para Sonar (tolerante a ausencia del archivo)
               sed -i 's|SF:.*/src|SF:src|g' coverage/lcov.info || true
               sed -i 's#\\\\#/#g' coverage/lcov.info || true
             '''
@@ -123,17 +115,19 @@ pipeline {
             )]) {
               sh '''
                 set -eux
-                # Login por HTTP al registry local (insecure registry ya configurado)
-                echo "$NEXUS_PASS" | docker login -u "$NEXUS_USER" --password-stdin http://${NEXUS_REGISTRY_PUSH}
 
-                # Build con dos tags (BUILD_NUMBER y latest)
-                docker build \
-                  -t ${IMAGE_NAME_PUSH}:${BUILD_NUMBER} \
-                  -t ${IMAGE_NAME_PUSH}:latest .
+                # Login SIN "http://", el demonio decide HTTP por insecure-registries
+                echo "$NEXUS_PASS" | docker login -u "$NEXUS_USER" --password-stdin ${NEXUS_REGISTRY}
 
-                # Push de ambas etiquetas
-                docker push ${IMAGE_NAME_PUSH}:${BUILD_NUMBER}
-                docker push ${IMAGE_NAME_PUSH}:latest
+                docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest .
+
+                # Reintentos por si hay EOF al subir blobs
+                for i in 1 2 3; do
+                  docker push ${IMAGE_NAME}:${BUILD_NUMBER} && break || { echo "Retry push ${BUILD_NUMBER} ($i/3)"; sleep 3; }
+                done
+                for i in 1 2 3; do
+                  docker push ${IMAGE_NAME}:latest && break || { echo "Retry push latest ($i/3)"; sleep 3; }
+                done
 
                 docker image prune -f || true
               '''
@@ -143,72 +137,65 @@ pipeline {
       }
     }
 
-stage('Deploy to Kubernetes') {
-  steps {
-    script {
-      withCredentials([
-        file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
-        usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
-      ]) {
-        sh '''
-          set -eux
+    stage('Deploy to Kubernetes') {
+      steps {
+        script {
+          withCredentials([
+            file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG_FILE'),
+            usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')
+          ]) {
+            sh '''
+              set -eux
 
-          NS="${K8S_NAMESPACE}"
-          DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
-          [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
+              NS="${K8S_NAMESPACE}"
+              DF="${DEPLOYMENT_FILE:-kubernetes.yaml}"
+              [ -f "$DF" ] || { echo "No se encontró $DF"; ls -la; exit 2; }
 
-          # Preparar kubeconfig dentro del workspace y montarlo de SOLO LECTURA
-          mkdir -p "$WORKSPACE/.kube"
-          cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
-          chmod 600 "$WORKSPACE/.kube/config"
+              # Preparar kubeconfig dentro del workspace (solo lectura al contenedor)
+              mkdir -p "$WORKSPACE/.kube"
+              cp "$KUBECONFIG_FILE" "$WORKSPACE/.kube/config"
+              chmod 600 "$WORKSPACE/.kube/config"
 
-          # "Aliases" para kubectl en contenedor con kubeconfig montado
-          KBASE="docker run --rm --user=0:0 -e HOME=/root -e KUBECONFIG=/root/.kube/config -v $WORKSPACE/.kube:/root/.kube:ro"
-          KC="$KBASE bitnami/kubectl:latest"
-          KCW="$KBASE -v $WORKSPACE:/work -w /work bitnami/kubectl:latest"
+              # "Aliases" para kubectl en contenedor con kubeconfig montado
+              KBASE="docker run --rm --user=0:0 -e HOME=/root -e KUBECONFIG=/root/.kube/config -v $WORKSPACE/.kube:/root/.kube:ro"
+              KC="$KBASE bitnami/kubectl:latest"
+              KCW="$KBASE -v $WORKSPACE:/work -w /work bitnami/kubectl:latest"
 
-          # 1) Crear/actualizar el imagePullSecret SIN usar archivo (pipe a apply)
-          REG_SERVER="${NEXUS_REGISTRY:-host.docker.internal:8082}"
-          echo "Usando registry para imagePullSecret: $REG_SERVER"
+              # 1) Crear/actualizar el imagePullSecret por PIPE (evita 'no objects passed to apply')
+              REG_SERVER="${NEXUS_REGISTRY}"
+              echo "Usando registry para imagePullSecret: $REG_SERVER"
 
-          $KC -n "$NS" create secret docker-registry nexus-docker \
-              --docker-server="$REG_SERVER" \
-              --docker-username="$REG_USER" \
-              --docker-password="$REG_PASS" \
-              --docker-email="noreply@local" \
-              --dry-run=client -o yaml | \
-          $KC -n "$NS" apply -f -
+              $KC -n "$NS" create secret docker-registry nexus-docker \
+                  --docker-server="$REG_SERVER" \
+                  --docker-username="$REG_USER" \
+                  --docker-password="$REG_PASS" \
+                  --docker-email="noreply@local" \
+                  --dry-run=client -o yaml \
+              | $KC -n "$NS" apply -f -
 
-          # 2) Aplicar manifiesto de la app (este sí requiere montar el workspace)
-          echo "==> Aplicando manifiesto: $DF"
-          $KCW -n "$NS" apply -f "$DF"
+              # 2) Aplicar manifiesto de la app
+              echo "==> Aplicando manifiesto: $DF"
+              $KCW -n "$NS" apply -f "$DF"
 
-          # 3) Forzar imagen exacta del build
-          echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
-          $KC -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
+              # 3) Forzar imagen exacta del build
+              echo "==> Set image a ${IMAGE_NAME}:${BUILD_NUMBER}"
+              $KC -n "$NS" set image deployment/backend-test backend-test=${IMAGE_NAME}:${BUILD_NUMBER}
 
-          # 4) Esperar rollout y chequear réplicas
-          $KC -n "$NS" rollout status deployment/backend-test --timeout=180s
-          DR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
-          AR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
-          echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
-          test -n "$DR" && [ "${AR:-0}" = "$DR" ]
+              # 4) Esperar rollout y chequear réplicas
+              $KC -n "$NS" rollout status deployment/backend-test --timeout=180s
+              DR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.spec.replicas}')
+              AR=$($KC -n "$NS" get deploy backend-test -o jsonpath='{.status.availableReplicas}')
+              echo "Replicas deseadas: ${DR:-?} | disponibles: ${AR:-0}"
+              test -n "$DR" && [ "${AR:-0}" = "$DR" ]
 
-          # 5) Diagnóstico final
-          $KC -n "$NS" get pods -l app=backend-test -o wide
-        '''
+              # 5) Diagnóstico final
+              $KC -n "$NS" get pods -l app=backend-test -o wide
+            '''
+          }
+        }
       }
     }
   }
-}
-
-
-
-
-    
-
-
-  } // stages
 
   post {
     always {
