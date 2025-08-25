@@ -4,7 +4,7 @@ import { Response } from 'express';
 
 @Controller('operaciones')
 export class OperacionesController {
-  constructor(private readonly operService: OperacionesService) {}
+  constructor(private readonly operService: OperacionesService) { }
 
   @Get()
   operar(
@@ -15,14 +15,13 @@ export class OperacionesController {
   ) {
     const calculo = this.operService.operar(operacion, +a, +b);
 
-    if (calculo) {
-      return res
-        .status(200)
-        .json({ resultado: calculo, mensaje: 'operacion exitosa' });
+    if (calculo !== undefined && !Number.isNaN(calculo)) {
+      return res.status(200).json({ resultado: calculo, mensaje: 'operacion exitosa' });
     }
 
-    return res
-      .status(502)
-      .json({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+    return res.status(502).json({
+      resultado: null,
+      mensaje: 'operacion no pudo ser calculada',
+    });
   }
 }
