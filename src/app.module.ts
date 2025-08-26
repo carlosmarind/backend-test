@@ -26,18 +26,22 @@ describe('AppController', () => {
   });
 
   it('should return hello', () => {
-    expect(appController.getHello()).toBe('Hello !!');
+    const result: string = appController.getHello();
+    expect(result).toBe('Hello !!');
   });
 
   it('should return apikey', () => {
-    expect(appController.getApikey()).toBe('APIKEY!!');
+    const result: string = appController.getApikey();
+    expect(result).toBe('APIKEY!!');
   });
 
-  it('should validate rut valid', () => {
-    expect(appController.validateRut('12345678-9')).toEqual({ mensaje: 'rut valido' });
+  it('should validate rut as valid', () => {
+    const result = appController.validateRut('12345678-9');
+    expect(result).toEqual({ mensaje: 'rut valido' });
   });
 
-  it('should validate rut invalid', () => {
-    expect(appController.validateRut('11111111-1')).toEqual({ mensaje: 'rut invalido' });
+  it('should validate rut as invalid', () => {
+    const result = appController.validateRut('11111111-1');
+    expect(result).toEqual({ mensaje: 'rut invalido' });
   });
 });
