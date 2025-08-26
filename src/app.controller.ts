@@ -17,10 +17,10 @@ export class AppController {
 
   @Get('/validate-rut')
   validateRut(@Query('rut') rut: string) {
-    const valido = this.appService.validateRut(rut);
-    if (valido) {
-      return { mensaje: 'rut valido' };
-    }
-    return { mensaje: 'rut invalido' };
+    const esValido = this.appService.validateRut(rut);
+
+    return esValido
+      ? { mensaje: 'rut valido' }
+      : { mensaje: 'rut invalido' };
   }
 }
