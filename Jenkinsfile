@@ -45,14 +45,13 @@ pipeline {
                 }
                 stage('Quality Gate'){
                     steps{
-                        timeout(time: 30, unit: 'SECONDS') {
-                            script {
-                                    def qg = waitForQualityGate()
-                                    if (qg.status != 'OK') {
-                                        error "La puerta de calidad no paso: ${qg.status}"
-                                    }
+                        timeout(time: 5, unit: 'MINUTES') {
+                            def qg = waitForQualityGate()
+                            if (qg.status != 'OK') {
+                                error "La puerta de calidad no paso: ${qg.status}"
                             }
                         }
+
                     }
                 }
             } 
