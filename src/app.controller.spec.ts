@@ -49,7 +49,18 @@ describe('AppController - e2e', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+    .overrideProvider(AppService)
+    .useValue({
+      getHello: () => 'Hello !!',
+      getApikey: () => 'API_KEY!!',
+      validateRut: (rut: string) => {
+        if (rut === '12345678-9') return true;  
+        if (rut === '11111111-1') return false; 
+        return false; 
+      },
+    })
+    .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
