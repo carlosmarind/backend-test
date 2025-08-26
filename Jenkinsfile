@@ -39,8 +39,8 @@ pipeline {
                 steps {
                     script {
                         docker.withRegistry('https://docker.io', 'dock-hub-credentials') {
-                            sh "docker build -t ${DOCKER_REGISTRY}/backend-test:Dev ."
-                            sh "docker tag backend-test-1:Dev ${DOCKER_REGISTRY}/backend-test:Dev"
+                            sh "docker build -t backend-test:Dev ."
+                            sh "docker tag backend-test:Dev ${DOCKER_REGISTRY}/backend-test:Dev"
                             sh "docker push ${DOCKER_REGISTRY}/backend-test:Dev"
                         }
                     }
