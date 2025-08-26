@@ -2,36 +2,42 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class OperacionesService {
-  operar(operacion: string = '', a: number, b: number) {
-    if (operacion === 'suma') {
-      return this.#suma(a, b);
-    } else if (operacion === 'resta') {
-      return this.#resta(a, b);
-    } else if (operacion === 'multiplicacion') {
-      return this.#multiplicacion(a, b);
-    } else if (operacion === 'division') {
-      return this.#division(a, b);
+  operar(operacion: string, a: number, b: number): number | undefined {
+    if (typeof a !== 'number' || typeof b !== 'number' || Number.isNaN(a) || Number.isNaN(b)) {
+      return undefined;
     }
-  }
 
-  #suma(a: number, b: number) {
-    return a + b;
-  }
+    const op = (operacion || '').toLowerCase().trim();
 
-  #resta(a: number, b: number) {
-    return a - b;
-  }
+    switch (op) {
+      case 'suma':
+      case 'sumar':
+      case 'add':
+      case '+':
+        return a + b;
 
-  #multiplicacion(a: number, b: number) {
-    return a * b;
-  }
+      case 'resta':
+      case 'restar':
+      case 'sub':
+      case '-':
+        return a - b;
 
-  #division(a: number, b: number) {
-    if (b === 0) {
-      return NaN;
-    } else if (a === 0) {
-      return 0;
+      case 'multiplicar':
+      case 'multiplicacion':
+      case 'producto':
+      case 'mul':
+      case '*':
+        return a * b;
+
+      case 'dividir':
+      case 'division':
+      case 'div':
+      case '/':
+        if (b === 0) return NaN;
+        return a / b;
+
+      default:
+        return undefined;
     }
-    return a / b;
   }
 }

@@ -10,21 +10,14 @@ export class AppService {
     private readonly config: ConfigType<typeof appConfig>,
   ) {}
 
-  // getHello(): string {
-  //   return `Hello ${this.config.username}!!`;
-  // }
-getHello(): string {
-  if (process.env.NODE_ENV === 'test') {
-    return 'Hello !!';
+  getHello(): string {
+    const name = this.config?.username ?? '';
+    return `Hello ${name}!!`;
   }
-  const name = this.config.username?.trim();
-  return name ? `Hello ${name}!!` : 'Hello !!';
-}
-
-
 
   getApikey(): string {
-    return `${this.config.apikey}!!`;
+    const key = this.config?.apikey ?? '';
+    return `${key}!!`;
   }
 
   validateRut(rut: string): boolean {
