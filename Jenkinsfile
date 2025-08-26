@@ -35,7 +35,7 @@ pipeline {
             }
         }
 
-            stage('Construcción de imagen Docker') {
+            stage('Etapa de empaquetado y Delivery') {
                 steps {
                     script {
                         docker.withRegistry('', 'dock-hub-credentials') {
