@@ -28,4 +28,15 @@ describe('AppService', () => {
   it('validateRut inválido devuelve false', () => {
     expect(service.validateRut('12.345.678-9')).toBe(false);
   });
+
+  it('getHello sin username => "Hello !!"', () => {
+    const s2 = new AppService({ username: undefined, apikey: 'x' } as any);
+    expect(s2.getHello()).toBe('Hello !!');
+  });
+
+  it('getApikey sin apikey => "!!"', () => {
+    const s2 = new AppService({ username: 'x', apikey: undefined } as any);
+    expect(s2.getApikey()).toBe('!!');
+  });
+
 });
