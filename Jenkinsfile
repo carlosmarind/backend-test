@@ -57,13 +57,13 @@ pipeline {
 			}
 		}
 		stage('Deploy a Kubernetes'){
-      steps{
-          script{
-              sh 'kubectl apply -f kubernetes.yaml'
-              sh 'kubectl rollout restart deployment/backend-test -n devops-test'
-              sh 'kubectl rollout status deployment/backend-test -n devops-test'
-          }
-      }
-  }
+			steps{
+				script{
+					sh 'kubectl apply -f kubernetes.yaml'
+					sh 'kubectl rollout restart deployment/backend-test -n devops-test'
+					sh 'kubectl rollout status deployment/backend-test -n devops-test'
+				}
+			}
+		}
 	}
 }
