@@ -1,60 +1,27 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: app-config
-data:
-  USERNAME: "cgma"
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: app-secrets
-type: Opaque
-stringData:
-  API_KEY: "qwerty012345"
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prueba-devops
+  name: backend-test
+  namespace: devops
+  labels:
+    app: backend-test
 spec:
-  replicas: 3
+  replicas: 3    
   selector:
     matchLabels:
-      app: prueba-devops
+      app: backend-test
   template:
     metadata:
       labels:
-        app: prueba-devops
+        app: backend-test
     spec:
       containers:
-        - name: prueba-devops
-          image: cesar-monges/prueba-devops:latest
-          ports:
-            - containerPort: 3000
-          env:
-            - name: USERNAME
-              valueFrom:
-                configMapKeyRef:
-                  name: app-config
-                  key: USERNAME
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: API_KEY
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: prueba-devops-service
-spec:
-  selector:
-    app: prueba-devops
-  ports:
-    - port: 80
-      targetPort: 3000
-  type: ClusterIP
+       - name: backend-test
+         image: localhost:8082/backend-test:latest
+         ports:
+          - containerPort: 3000
+         env:
+          - name: NODE_ENV
+            value: development
+          - name: PORT
+            value: "3000"
