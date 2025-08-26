@@ -38,10 +38,10 @@ pipeline {
             stage('Construcción de imagen Docker') {
                 steps {
                     script {
-                        docker.withRegistry('https://docker.io', 'dock-hub-credentials') {
-                            sh "docker build -t backend-test:Dev ."
-                            sh "docker tag backend-test:Dev ${DOCKER_REGISTRY}/backend-test:Dev"
-                            sh "docker push ${DOCKER_REGISTRY}/backend-test:Dev"
+                        docker.withRegistry('', 'dock-hub-credentials') {
+                            sh "docker build -t ${DOCKER_REPO}:Dev ."
+                            sh "docker tag ${DOCKER_REPO}:Dev ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
+                            sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
                         }
                     }
                 }
