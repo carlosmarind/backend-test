@@ -45,7 +45,7 @@ pipeline{
                 } 
                 stage ('Quality gate'){
                     steps{
-                        timeout(time: 60, unit: 'SECONDS'){
+                        timeout(time: 30, unit: 'SECONDS'){
                             script{
                                 def qg = waitForQualityGate()
                                 if(qg.status != 'OK'){
@@ -74,7 +74,7 @@ pipeline{
                 docker.withRegistry('http://localhost:8082', 'nexus-credencial'){  
                     
                     sh 'docker push localhost:8082/backend-test:latest'
-                    //sh "docker push localhost:8082/backend-test:${env.BUILD_NUMBER}"
+                    sh "docker push localhost:8082/backend-test:${env.BUILD_NUMBER}"
                 }
             }
             

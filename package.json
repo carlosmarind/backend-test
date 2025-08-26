@@ -70,7 +70,7 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
-    "coveragePathIgnorePatterns": ["main.ts", "configuration.ts"],
+    "coveragePathIgnorePatterns": ["main.ts", "configuration.ts", "src/app.service.spec.ts", "src/app.controller.spec.ts"],
     "coverageThreshold": {
       "global": {
         "branches": 90,
