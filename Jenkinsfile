@@ -38,7 +38,7 @@ pipeline {
             stage('Construcción de imagen Docker') {
                 steps {
                     script {
-                        docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+                        docker.withRegistry('https://docker.io', 'docker-hub-credentials') {
                             sh "docker build -t ${DOCKER_REGISTRY}/backend-test:Dev ."
                             sh "docker tag backend-test-1:Dev ${DOCKER_REGISTRY}/backend-test:Dev"
                             sh "docker push ${DOCKER_REGISTRY}/backend-test:Dev"
