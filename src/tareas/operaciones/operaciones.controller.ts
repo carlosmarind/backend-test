@@ -15,7 +15,9 @@ export class OperacionesController {
   ) {
     const calculo = this.operService.operar(operacion, +a, +b);
 
-    if (calculo) {
+    // Se comprueba explícitamente que el resultado no sea undefined (operación inválida) o NaN (división por cero).
+    // Esto permite que el 0 sea un resultado válido.
+    if (calculo !== undefined && !Number.isNaN(calculo)) {
       return res
         .status(200)
         .json({ resultado: calculo, mensaje: 'operacion exitosa' });
@@ -23,6 +25,6 @@ export class OperacionesController {
 
     return res
       .status(502)
-      .json({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+      .json({ resultado: null, mensaje: 'operacion no pudo ser calculada' });
   }
 }
