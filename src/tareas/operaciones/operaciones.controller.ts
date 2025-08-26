@@ -14,15 +14,12 @@ export class OperacionesController {
     @Query('b') b: number,
   ) {
     const calculo = this.operService.operar(operacion, +a, +b);
+    const valido = typeof calculo === 'number' && Number.isFinite(calculo) && !Number.isNaN(calculo);
 
-    if (calculo) {
-      return res
-        .status(200)
-        .json({ resultado: calculo, mensaje: 'operacion exitosa' });
+    if (valido) {
+      return res.status(200).json({ resultado: calculo, mensaje: 'operacion exitosa' });
     }
 
-    return res
-      .status(502)
-      .json({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+    return res.status(502).json({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
   }
 }

@@ -1,37 +1,28 @@
+// src/tareas/operaciones/operaciones.service.ts
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class OperacionesService {
-  operar(operacion: string = '', a: number, b: number) {
-    if (operacion === 'suma') {
-      return this.#suma(a, b);
-    } else if (operacion === 'resta') {
-      return this.#resta(a, b);
-    } else if (operacion === 'multiplicacion') {
-      return this.#multiplicacion(a, b);
-    } else if (operacion === 'division') {
-      return this.#division(a, b);
+  operar(
+    operacion: string,
+    a: number,
+    b: number,
+  ): number | null | undefined {
+    if (!Number.isFinite(a) || !Number.isFinite(b)) {
+      return null;
     }
-  }
 
-  #suma(a: number, b: number) {
-    return a + b;
-  }
-
-  #resta(a: number, b: number) {
-    return a - b;
-  }
-
-  #multiplicacion(a: number, b: number) {
-    return a * b;
-  }
-
-  #division(a: number, b: number) {
-    if (b === 0) {
-      return NaN;
-    } else if (a === 0) {
-      return 0;
+    switch (operacion) {
+      case 'suma':
+        return a + b;
+      case 'resta':
+        return a - b;
+      case 'multiplicar':
+        return a * b;
+      case 'dividir':
+        return b === 0 ? null : a / b;
+      default:
+        return undefined;
     }
-    return a / b;
   }
 }
