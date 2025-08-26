@@ -4,22 +4,23 @@ import { AppService } from './app.service';
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
-import { ConfigModule } from '@nestjs/config';
-import configuration from './config/configuration';
 
 describe('AppController - Unit', () => {
   let appController: AppController;
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          load: [configuration],
-        }),
-      ],
       controllers: [AppController],
-      providers: [AppService],
+      providers: [
+        {
+          provide: AppService,
+          useValue: {
+            getHello: jest.fn().mockReturnValue('Hello !!'),
+            getApikey: jest.fn().mockReturnValue('API_KEY!!'),
+            validateRut: jest.fn((rut: string) => rut === '12345678-9'),
+          },
+        },
+      ],
     }).compile();
 
     appController = app.get<AppController>(AppController);
@@ -30,9 +31,8 @@ describe('AppController - Unit', () => {
   });
 
   it('getApikey should return API key', () => {
-    expect(appController.getApikey()).toBe('API_KEY!!'); 
+    expect(appController.getApikey()).toBe('API_KEY!!');
   });
-
 
   it('validateRut should return "rut valido" for valid RUT', () => {
     expect(appController.validateRut('12345678-9')).toEqual({ mensaje: 'rut valido' });
@@ -63,7 +63,7 @@ describe('AppController - e2e', () => {
     return request(app.getHttpServer())
       .get('/apikey')
       .expect(200)
-      .expect(/!!/); // Ajusta según tu apikey
+      .expect(/!!/);
   });
 
   it('/validate-rut (GET) valid rut', () => {
