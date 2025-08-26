@@ -1,6 +1,6 @@
 pipeline {
   agent any
-  tools { nodejs 'nodejs-20' }
+  tools { nodejs 'nodejs-22' }
   options { timestamps(); skipDefaultCheckout(true) }
 
   environment {
@@ -13,13 +13,18 @@ pipeline {
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        deleteDir()
+        checkout scm
+      }
     }
 
     stage('Install & Test') {
       steps {
         powershell '''
           $ErrorActionPreference = "Stop"
+          if (!(Test-Path ".\\jest.config.js")) { Write-Error "Falta jest.config.js"; exit 1 }
+          if (Test-Path coverage) { Remove-Item -Recurse -Force coverage }
           npm ci
           npx jest --config=jest.config.js --coverage --runInBand
           if (!(Test-Path coverage/lcov.info)) { Write-Error "Falta coverage/lcov.info"; exit 1 }
