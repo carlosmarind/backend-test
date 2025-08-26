@@ -60,12 +60,12 @@ pipeline{
         }
         stage('Etapa de empaquetado y delivery'){
           steps{
-            sh 'docker build -t backend-test .'
+            sh 'docker build -t backend-test:cma .'
 
             //sh 'docker tag backend-test dockermonges/backend-test:latest'
-            sh 'docker tag backend-test localhost:8082/backend-test:latest'
+            sh 'docker tag backend-test:cma localhost:8082/backend-test:latest'
 
-            sh "docker tag backend-test localhost:8082/backend-test:${env.BUILD_NUMBER}"
+            sh "docker tag backend-test:cma localhost:8082/backend-test:${env.BUILD_NUMBER}"
             
             script{
                /*docker.withRegistry('', 'f9e70e70-833b-4fbe-9635-7c57ea832e76'){ 
@@ -74,7 +74,7 @@ pipeline{
                 docker.withRegistry('http://localhost:8082', 'nexus-credencial'){  
                     
                     sh 'docker push localhost:8082/backend-test:latest'
-                    sh "docker push localhost:8082/backend-test:${env.BUILD_NUMBER}"
+                    //sh "docker push localhost:8082/backend-test:${env.BUILD_NUMBER}"
                 }
             }
             
