@@ -49,7 +49,9 @@ pipeline {
 				script{
 					docker.withRegistry('http://localhost:8082', 'nexus-credentials'){	
 						sh 'docker tag backend-test localhost:8082/backend-test:${BUILD_NUMBER}'
+						sh "docker tag backend-test localhost:8082/backend-test:latest"
 						sh 'docker push localhost:8082/backend-test:${BUILD_NUMBER}'
+						sh "docker push localhost:8082/backend-test:latest"
 					}
 				}
 			}
