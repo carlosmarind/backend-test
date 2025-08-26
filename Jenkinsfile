@@ -39,7 +39,9 @@ pipeline {
                 steps {
                     script {
                         docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                            sh "docker build -t landaura/backend-test:Dev ."
+                            sh "docker build -t ${DOCKER_REGISTRY}/backend-test:Dev ."
+                            sh "docker tag backend-test-1:Dev ${DOCKER_REGISTRY}/backend-test:Dev"
+                            sh "docker push ${DOCKER_REGISTRY}/backend-test:Dev"
                         }
                     }
                 }
