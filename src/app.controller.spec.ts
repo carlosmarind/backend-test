@@ -30,8 +30,9 @@ describe('AppController - Unit', () => {
   });
 
   it('getApikey should return API key', () => {
-    expect(appController.getApikey()).toBe('API_KEY!!'); // Reemplaza con tu valor de config
+    expect(appController.getApikey()).toBe('API_KEY!!'); 
   });
+
 
   it('validateRut should return "rut valido" for valid RUT', () => {
     expect(appController.validateRut('12345678-9')).toEqual({ mensaje: 'rut valido' });
