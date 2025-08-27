@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: devops
+data:
+  USERNAME: "Mongeniano" 
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+  namespace: devops
+type: Opaque
+data:
+  API_KEY: c3VwZXJLZXkxMjM=
+---    
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-test
+  namespace: devops
+  labels:
+    app: backend-test
+spec:
+  replicas: 3    
+  selector:
+    matchLabels:
+      app: backend-test
+  template:
+    metadata:
+      labels:
+        app: backend-test
+    spec:
+      containers:
+       - name: backend-test
+         image: localhost:8082/backend-test:latest
+         imagePullPolicy: Always 
+         env:
+          - name: NODE_ENV
+            value: development
+          - name: PORT
+            value: "3000"
+          - name: USERNAME
+            valueFrom:
+              configMapKeyRef:
+                name: app-config
+                key: USERNAME
+          - name: API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: app-secret
+                key: API_KEY    
+      imagePullSecrets:
+        - name: docker-registry-secret    
+---  
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-test
+  namespace: devops
+  labels:
+    app: backend-test
+spec:   
+  selector: 
+    app: backend-test 
+  ports:
+  - protocol: TCP
+    port: 80             
+    targetPort: 3000
