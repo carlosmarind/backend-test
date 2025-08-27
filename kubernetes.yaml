@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-test
+  namespace: devops-test
+  labels:
+    app: backend-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-test
+  template:
+    metadata:
+      labels:
+        app: backend-test
+    spec:
+      containers:
+        - name: backend-test
+          image: localhost:8082/backend-test:latest
+          imagePullPolicy: Always
+          env:
+            - name: NODE_ENV
+              value: development
+            - name: PORT
+              value: "4000"
+            - name: USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-test-config
+                  key: USERNAME
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-test-secret
+                  key: API_KEY
+          ports:
+            - containerPort: 4000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-test-config
+  namespace: devops-test
+data:
+  USERNAME: "backend-user"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-test-service
+  namespace: devops-test
+  labels:
+    app: backend-test
+spec:
+  selector:
+    app: backend-test
+  ports:
+    - port: 80
+      targetPort: 4000
+      protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-test-secret
+  namespace: devops-test
+type: Opaque
+data:
+  API_KEY: bXlhcGlrZXkxMjM=  # base64 encoded value
