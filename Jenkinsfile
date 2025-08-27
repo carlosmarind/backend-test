@@ -48,7 +48,18 @@ pipeline {
                 }
             }
         }
-
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 1, unit: 'HOURS') {
+                    script {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Fallo la Quality Gate: ${qg.status}"
+                        }
+                    }
+                }
+            }
+        }
         stage('Etapa de empaquetado y Delivery') {
             steps {
                 script {
