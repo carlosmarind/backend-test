@@ -33,6 +33,7 @@ pipeline {
                     sh 'docker build -t backend-test .'
                     sh 'docker tag backend-test carlos/backend-test'
                     sh 'docker push carlos/backend-test'
+                    
                 }
             }
           }
