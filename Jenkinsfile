@@ -28,9 +28,13 @@ pipeline {
       }
       stage('Etapa de empaquetado y despliegue') {
           steps {
-              sh 'docker build -t backend-test .'
-              sh'docker tag backend-test carlos/backend-test'
-              sh 'docker push carlos/backend-test'
+            script {
+                docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+                    sh 'docker build -t backend-test .'
+                    sh 'docker tag backend-test carlos/backend-test'
+                    sh 'docker push carlos/backend-test'
+                }
+            }
           }
       }
   }
