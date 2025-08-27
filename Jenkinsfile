@@ -1,25 +1,19 @@
 pipeline {
   agent any
   stages {
-      stage('Build') {
-          steps {
-              echo 'Building...'
+      stage('Instalacion de dependencias') {
+          agent {
+              docker {
+                  image 'node:22'
+                  reuseNode true
+              }
           }
-      }
-      stage('Build2') {
-          steps {
-              echo 'Building2...'
-              echo 'Building3...'
-          }
-      }
-      stage('Test') {
-          steps {
-              echo 'Testing...'
-          }
-      }
-      stage('Deploy') {
-          steps {
-              echo 'Deploying...'
+          stages {
+              stage('Instalacion de dependencias') {
+                  steps {
+                      sh 'npm install'
+                  }
+              }
           }
       }
   }
