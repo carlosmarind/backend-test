@@ -80,10 +80,19 @@ pipeline{
             
           }
         }
-        /*stage('Actualización de imagen'){
-            steps{
-                sh "kubectl -n devops set image deployments backend-test backend-test=localhost:8082/backend-test:${env.BUILD_NUMBER}"
+        stage('Actualización de imagen'){
+            agent{
+                docker{
+                    image 'alpine/k8s:1.32.2'
+                    reuseNode true
+                }
             }
-        }*/
+            steps{
+                withKubeConfig([credentialsId: 'kubeconfig-docker', serverUrl: 'http:/localhost:8082']){
+                    sh "kubectl -n devops set image deployments backend-test backend-test=localhost:8082/backend-test:${env.BUILD_NUMBER}"
+                }
+                
+            }
+        }
     }
 }
