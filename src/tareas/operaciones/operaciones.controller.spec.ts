@@ -29,4 +29,25 @@ describe('AppController (e2e)', () => {
       .query({ operacion: 'multidividir', a: 90, b: 30 })
       .expect(422);
   });
+
+  it('/operaciones (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/operaciones')
+      .query({ operacion: 'division', a: 90, b: 30 })
+      .expect(200);
+  });
+
+  it('/operaciones (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/operaciones')
+      .query({ operacion: 'multiplicacion', a: 3, b: 30 })
+      .expect(200);
+  });
+
+  it('/operaciones (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/operaciones')
+      .query({ operacion: 'resta', a: 3, b: 30 })
+      .expect(200);
+  });
 });
