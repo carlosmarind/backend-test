@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-test
+  template:
+    metadata:
+      labels:
+        app: backend-test
+    spec:
+      containers:
+        - name: backend-test
+          image: backend-test:latest
+          ports:
+            - containerPort: 4000
