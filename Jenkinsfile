@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        NODE_VERSION = '20'
+        NODE_VERSION = '22'
         DOCKER_REGISTRY = 'landaura'
         DOCKER_REPO = 'backend-test'
         SONARQUBE = 'SonarQube'  // nombre configurado en Jenkins para sonar
@@ -42,6 +42,11 @@ pipeline {
                             sh "docker build -t ${DOCKER_REPO}:Dev ."
                             sh "docker tag ${DOCKER_REPO}:Dev ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
                             sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
+                        }
+                        docker.withRegistry('http://localhost:8082', 'nexus-hub-credentials') {
+                            sh "docker build -t ${DOCKER_REPO}:Dev ."
+                            sh "docker tag ${DOCKER_REPO}:Dev localhost:8082/${DOCKER_REPO}:Dev"
+                            sh "docker push localhost:8082/${DOCKER_REPO}:Dev"
                         }
                     }
                 }
