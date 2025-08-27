@@ -62,15 +62,18 @@ pipeline {
             steps {
                 sh 'docker build -t backend-node-devops:cmd .'
 
+                sh "docker tag backend-node-devops:cmd localhost:8082/backend-node-devops:latest"
+                sh "docker tag backend-node-devops:cmd localhost:8082/backend-node-devops:${BUILD_NUMBER}"
+
                 script {
                     docker.withRegistry('http://localhost:8082', 'nexus-credentials-id') {
                         sh "docker push localhost:8082/backend-node-devops:latest"
                         sh "docker push localhost:8082/backend-node-devops:${BUILD_NUMBER}"
                     }
                 }
-
             }
         }
+
 
 
         stage('Despliegue continuo') {
