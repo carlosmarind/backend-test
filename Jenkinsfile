@@ -1,7 +1,7 @@
 pipeline {
   agent any
   stages {
-      stage('Instalacion de dependencias') {
+      stage('Etapa de construccion') {
           agent {
               docker {
                   image 'node:22'
@@ -24,6 +24,11 @@ pipeline {
                       sh 'npm run build'
                   }
               }
+          }
+      }
+      stage('Etapa de empaquetado y despliegue') {
+          steps {
+              sh 'docker build -t backend-test .'
           }
       }
   }
