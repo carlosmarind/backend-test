@@ -26,7 +26,7 @@ pipeline{
                 }
             }
            
-        } 
+        }  
         stage ('Aseguramiento de calidad'){
             agent{
                 docker {
