@@ -61,8 +61,8 @@ pipeline {
         stage('Etapa de empaquetado y delivery') {
             steps {
                 sh 'docker build -t backend-node-devops:cmd .'
-                sh "docker tag backend-node-devops:cmd cristofermondacagarrido/backend-node-devops:${BUILD_NUMBER}"
                 sh "docker tag backend-node-devops:cmd localhost:8082/backend-node-devops:${BUILD_NUMBER}"
+                sh "docker push localhost:8082/backend-node-devops:${BUILD_NUMBER}"
 
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-cred') {
