@@ -81,6 +81,9 @@ pipeline{
           }
         }
         stage('Actualización de imagen'){
+            /*when{
+                branch 'main'
+            }*/
             agent{
                 docker{
                     image 'alpine/k8s:1.32.2'
@@ -88,8 +91,8 @@ pipeline{
                 }
             }
             steps{
-                withKubeConfig([credentialsId: 'kubeconfig-docker', serverUrl: 'http:/localhost:8082']){
-                    sh "kubectl -n devops set image deployments backend-test backend-test=localhost:8082/backend-test:${env.BUILD_NUMBER}"
+                withKubeConfig([credentialsId: 'dd82b490-487e-4d7e-8266-ad8cdf2b9271']){
+                   sh "kubectl -n devops set image deployments backend-test backend-test=localhost:8082/backend-test:${env.BUILD_NUMBER}"
                 }
                 
             }

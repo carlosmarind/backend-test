@@ -13,7 +13,7 @@ metadata:
   namespace: devops
 type: Opaque
 data:
-  API_KEY: 
+  API_KEY: c3VwZXJLZXkxMjM=
 ---    
 
 apiVersion: v1
