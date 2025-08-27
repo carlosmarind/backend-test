@@ -21,7 +21,7 @@ pipeline {
               }
               stage('Construccion de la aplicacion') {
                   steps {
-                      sh 'npm run buil'
+                      sh 'npm run build'
                   }
               }
           }
