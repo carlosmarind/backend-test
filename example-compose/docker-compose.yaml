@@ -1,0 +1,23 @@
+services:
+  wordpress:
+    image: wordpress
+    ports:
+      - "8080:80"
+    restart: always
+    environment:
+      - WORDPRESS_DB_HOST=db
+      - WORDPRESS_DB_USER=user-wordpress
+      - WORDPRESS_DB_PASSWORD=pass-wordpress
+      - WORDPRESS_DB_NAME=wordpress
+  db:
+    image: mysql
+    restart: always
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root-mysql
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=user-wordpress
+      - MYSQL_PASSWORD=pass-wordpress
+volumes:
+  db_data:
