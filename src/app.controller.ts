@@ -1,27 +1,29 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
-import { AppService } from './app.service';
-import { Response } from 'express';
+import { Injectable, Inject } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
+import { validateRut as rutValidator } from 'rutlib';
+import appConfig from './config/configuration';
 
-@Controller()
-export class AppController {
-  constructor(private readonly appService: AppService) {}
+@Injectable()
+export class AppService {
+  constructor(
+    @Inject(appConfig.KEY)
+    private readonly config: ConfigType<typeof appConfig>,
+  ) {}
 
-  @Get()
   getHello(): string {
-    return this.appService.getHello();
+    const username = this.config?.username ?? 'User';
+    return `Hello ${username}!!`;
   }
 
-  @Get('/apikey')
   getApikey(): string {
-    return this.appService.getApikey();
+    const apikey = this.config?.apikey ?? '';
+    return `${apikey}!!`;
   }
 
-  @Get('/validate-rut')
-  validateRut(@Res() res: Response, @Query('rut') rut: string) {
-    const valido = this.appService.validateRut(rut);
-    if (valido) {
-      return res.status(200).json({ mensaje: 'rut valido' });
+  validateRut(rut?: string): boolean {
+    if (!rut || typeof rut !== 'string') {
+      return false;
     }
-    return res.status(400).json({ mensaje: 'rut invalido' });
+    return rutValidator(rut);
   }
 }
