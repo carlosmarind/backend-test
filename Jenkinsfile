@@ -80,10 +80,10 @@ pipeline{
             
           }
         }
-        stage('Actualización de imagen'){
+        /*stage('Actualización de imagen'){
             steps{
                 sh "kubectl -n devops set image deployments backend-test backend-test=localhost:8082/backend-test:${env.BUILD_NUMBER}"
             }
-        }
+        }*/
     }
 }
