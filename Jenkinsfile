@@ -28,12 +28,12 @@ pipeline {
             }
         }
 
-
         stage('Construcción de aplicación') {
             steps {
                 sh 'npm run build'
             }
         }
+
         stage('Quality Assurance') {
             agent {
                 docker {
@@ -41,29 +41,25 @@ pipeline {
                     reuseNode true
                 }
             }
-            stages {
-                stage('Upload de codigo a SonarQube') {
-                    steps {
-                        withSonarQubeEnv('SonarQube') {
-                            sh 'sonar-scanner'
-                        }
-                        
-                    }
+            steps {
+                withSonarQubeEnv("${SONARQUBE}") {
+                    sh 'sonar-scanner'
                 }
             }
-            stage('Etapa de empaquetado y Delivery') {
-                steps {
-                    script {
-                        docker.withRegistry('', 'dock-hub-credentials') {
-                            sh "docker build -t ${DOCKER_REPO}:Dev ."
-                            sh "docker tag ${DOCKER_REPO}:Dev ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
-                            sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
-                        }
-                        docker.withRegistry('http://localhost:8082', 'nexus-hub-credentials') {
-                            sh "docker build -t ${DOCKER_REPO}:Dev ."
-                            sh "docker tag ${DOCKER_REPO}:Dev localhost:8082/${DOCKER_REPO}:Dev"
-                            sh "docker push localhost:8082/${DOCKER_REPO}:Dev"
-                        }
+        }
+
+        stage('Etapa de empaquetado y Delivery') {
+            steps {
+                script {
+                    docker.withRegistry('', 'dock-hub-credentials') {
+                        sh "docker build -t ${DOCKER_REPO}:Dev ."
+                        sh "docker tag ${DOCKER_REPO}:Dev ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
+                        sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
+                    }
+                    docker.withRegistry('http://localhost:8082', 'nexus-hub-credentials') {
+                        sh "docker build -t ${DOCKER_REPO}:Dev ."
+                        sh "docker tag ${DOCKER_REPO}:Dev localhost:8082/${DOCKER_REPO}:Dev"
+                        sh "docker push localhost:8082/${DOCKER_REPO}:Dev"
                     }
                 }
             }
