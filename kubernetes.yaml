@@ -4,7 +4,7 @@ metadata:
   name: app-config
   namespace: devops
 data:
-  USERNAME: "Mongeniano"
+  USERNAME: ""
 ---
 apiVersion: v1
 kind: Secret
@@ -13,7 +13,7 @@ metadata:
   namespace: devops
 type: Opaque
 data:
-  API_KEY: c3VwZXJLZXkxMjM=
+  API_KEY: 
 ---    
 
 apiVersion: v1
