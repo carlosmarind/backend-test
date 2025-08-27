@@ -61,20 +61,17 @@ pipeline {
         stage('Etapa de empaquetado y delivery') {
             steps {
                 sh 'docker build -t backend-node-devops:cmd .'
-                sh "docker tag backend-node-devops:cmd nexus:8082/backend-node-devops:62"
-                sh "docker push nexus:8082/backend-node-devops:62"
 
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-cred') {
-                        sh "docker push cristofermondacagarrido/backend-node-devops:${BUILD_NUMBER}"
-                    }
-
-                    docker.withRegistry('http://localhost:8082', 'nexus-cred') {
+                    docker.withRegistry('http://localhost:8082', 'nexus-credentials-id') {
+                        sh "docker push localhost:8082/backend-node-devops:latest"
                         sh "docker push localhost:8082/backend-node-devops:${BUILD_NUMBER}"
                     }
                 }
+
             }
         }
+
 
         stage('Despliegue continuo') {
             when {
