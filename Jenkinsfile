@@ -1,7 +1,7 @@
 pipeline {
   agent any
   stages {
-      stage('Etapa de construccion') {
+      stage('Etapa de construccion / buil de la aplicacion') {
           agent {
               docker {
                   image 'node:22'
@@ -30,9 +30,9 @@ pipeline {
           steps {
             script {
                 docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
-                    sh 'docker build -t backend-test .'
-                    sh 'docker tag backend-test crojasalvear/backend-test'
-                    sh 'docker push crojasalvear/backend-test'
+                    sh 'docker build -t backend-test:crl .'
+                    sh 'docker tag backend-test:crl crojasalvear/backend-test:crl'
+                    sh 'docker push crojasalvear/backend-test:crl'
                 }
             }
           }
