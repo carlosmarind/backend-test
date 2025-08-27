@@ -47,6 +47,7 @@ pipeline {
                         withSonarQubeEnv('SonarQube') {
                             sh 'sonar-scanner'
                         }
+                        
                     }
                 }
             }
@@ -65,6 +66,7 @@ pipeline {
                         }
                     }
                 }
+            }
         }
     }
 }
