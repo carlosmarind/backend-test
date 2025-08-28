@@ -26,6 +26,23 @@ pipeline {
               }
           }
       }
+      stage('Etapa de analisis de calidad de codigo') {
+          agent {
+              docker {
+                  image 'sonarsource/sonar-scanner-cli'
+                  reuseNode true
+              }
+          }
+          stages {
+              stage('Upload de calidad de codigo a SonarQube') {
+                  steps {
+                    withSonarQubeEnv('sonarqube-server') {
+                        sh 'sonar-scanner'
+                      }
+                  }
+              }
+          }
+      }
       stage('Etapa de empaquetado y despliegue') {
           steps {
             script {
