@@ -16,7 +16,7 @@ pipeline {
               }
               stage('Ejecucion de pruebas') {
                   steps {
-                      sh 'npm run test:cov'
+                      sh 'npm run test:cov -- --ci --runInBand'
                   }
               }
               stage('Construccion de la aplicacion') {
