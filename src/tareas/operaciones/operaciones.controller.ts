@@ -15,7 +15,7 @@ export class OperacionesController {
   ) {
     const calculo = this.operService.operar(operacion, +a, +b);
 
-    if (calculo) {
+    if (calculo !== undefined) {
       return res
         .status(200)
         .json({ resultado: calculo, mensaje: 'operacion exitosa' });
