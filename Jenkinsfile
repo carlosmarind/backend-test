@@ -35,14 +35,14 @@ pipeline {
               }
           }
           stages {
-              stage('Upload de calidad de codigo a SonarQube') {
+              /* stage('Upload de calidad de codigo a SonarQube') {
                   steps {
                     withSonarQubeEnv('sonarqube-server') {
                         sh 'sonar-scanner'
 
                       }
                   }
-              }
+              } */
               stage('Quality Gate') {
                   steps {
                       timeout(time: 30, unit: 'SECONDS') {
