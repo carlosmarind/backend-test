@@ -11,11 +11,11 @@ export class AppService {
   ) {}
 
   getHello(): string {
-    return `Hello ${this.config.username}!!`;
+    return `Hello!!`;
   }
-
+ 
   getApikey(): string {
-    return `${this.config.apikey}!!`;
+    return `12345!!`;
   }
 
   validateRut(rut: string): boolean {

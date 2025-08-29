@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-test
+  namespace: devops
+  labels:
+    app: backend-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-test
+  template:
+    metadata:
+      labels:
+        app: backend-test
+    spec:
+      containers:
+      - name: backend-test
+        image: localhost:8082/backend-test:latest
+        imagePullPolicy: Always
+        env:
+        - name: NODE_ENV_SECUNDARY
+          value: development
+        - name: PORT_SECUNDARY
+          value: "3000"
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: sp-backend
+              key: PORT
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: sp-backend
+              key: NODE_ENV
+        - name: BBDD_URL
+          valueFrom:
+            configMapKeyRef:
+              name: sp-backend
+              key: BBDD_URL
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sp-backend
+              key: PASSWORD
+      imagePullSecrets:
+      - name: docker-registry-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-test
+  namespace: devops
+  labels:
+    app: backend-test
+spec:
+  selector:
+    app: backend-test
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-backend-devops
+  namespace: devops
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: backend.test.cl
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: backend-test
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - backend.test.cl
+    secretName: backend-tls
