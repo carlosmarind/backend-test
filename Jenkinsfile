@@ -63,17 +63,13 @@ pipeline {
         stage('Etapa de empaquetado y Delivery') {
             steps {
                 sh "docker build -t ${DOCKER_REPO}:Dev ."
-                sh "docker tag ${DOCKER_REPO}:Dev ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
+                sh "docker tag ${DOCKER_REPO}:Dev ${DOCKER_REGISTRY}/${DOCKER_REPO}:${BUILD_NUMBER}"
                 sh "docker tag ${DOCKER_REPO}:Dev localhost:8082/${DOCKER_REPO}:${BUILD_NUMBER}"
                 script {
                     docker.withRegistry('', 'dock-hub-credentials') {
-                        sh "docker build -t ${DOCKER_REPO}:Dev ."
-                        sh "docker tag ${DOCKER_REPO}:Dev ${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev"
                         sh "docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${BUILD_NUMBER}"
                     }
                     docker.withRegistry('http://localhost:8082', 'nexus-hub-credentials') {
-                        sh "docker build -t ${DOCKER_REPO}:Dev ."
-                        sh "docker tag ${DOCKER_REPO}:Dev localhost:8082/${DOCKER_REPO}:Dev"
                         sh "docker push localhost:8082/${DOCKER_REPO}:${BUILD_NUMBER}"
                     }
                 }
