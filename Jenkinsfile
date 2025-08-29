@@ -65,10 +65,10 @@ pipeline {
                     sh 'docker tag backend-test:crl crojasalvear/backend-test:crl'
                     sh 'docker push crojasalvear/backend-test:crl'
                 }
-                /* docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
-                    sh 'docker tag backend-test:crl localhost:8082/backend-test:crl'
-                    sh 'docker push localhost:8082/backend-test:crl'
-                } */
+                docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
+                    sh 'docker tag backend-test:latest localhost:8082/backend-test:latest'
+                    sh 'docker push localhost:8082/backend-test:latest'
+                }
             }
           }
       }
