@@ -91,7 +91,7 @@ pipeline {
             }
             steps {
                 withKubeConfig([credentialsId: 'kubeconfig',]) {
-                    sh "kubectl -n devops set image deployments backend-test backend-test=localhost:8082/backend-test:rc1"
+                    sh "kubectl -n devops set image deployments backend-test backend-test=localhost:8082/backend-test:${BUILD_NUMBER}"
                 }
             }
         }
