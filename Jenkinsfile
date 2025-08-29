@@ -26,5 +26,12 @@ pipeline {
                 }
             }
         }
+         stage('2. Packaging and delivery stage') {
+             steps {
+                sh 'docker build -t backend-test:cmd .'
+                sh "docker tag backend-test:cmd cmilabaca/backend-test:${BUILD_NUMBER}"
+                sh "docker tag backend-test:cmd localhost:8082/backend-test:${BUILD_NUMBER}"
+            }
+         }
     }
 }
