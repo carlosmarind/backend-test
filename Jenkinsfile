@@ -77,9 +77,15 @@ pipeline {
             }
         }
         stage('Despliegue continuo') {
+            agent{
+                docker{
+                    image 'alpine/k8s:1.32.2'
+                    reuseNode true
+                }
+            }
             steps {
-                script {
-                    sh "kubectl set image deployment/${DOCKER_REPO} ${DOCKER_REPO}=${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev --record"
+                withKubeConfig([credentialsId: 'kubeconfig',]) {
+                    sh "kubectl -n devops set image deployments backend-test backend-test=localhost:8082/backend-test:rc1"
                 }
             }
         }
