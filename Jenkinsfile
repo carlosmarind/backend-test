@@ -76,6 +76,9 @@ pipeline {
             }
         }
         stage('Despliegue continuo') {
+            when{
+                branch 'main'
+            }
             agent{
                 docker{
                     image 'alpine/k8s:1.32.2'
