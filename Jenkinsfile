@@ -76,5 +76,12 @@ pipeline {
                 }
             }
         }
+        stage('Despliegue continuo') {
+            steps {
+                script {
+                    sh "kubectl set image deployment/${DOCKER_REPO} ${DOCKER_REPO}=${DOCKER_REGISTRY}/${DOCKER_REPO}:Dev --record"
+                }
+            }
+        }
     }
 }

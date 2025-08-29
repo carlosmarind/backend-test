@@ -1,9 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend-test
+  namespace: devops
+  labels:
+    app: backend-test
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: backend-test
@@ -14,6 +22,72 @@ spec:
     spec:
       containers:
         - name: backend-test
-          image: backend-test:latest
-          ports:
-            - containerPort: 4000
+          image: localhost:8082/backend-test:Dev
+          imagePullPolicy: Always
+          env:
+          - name: NODE_ENV_SECUNDARIA
+            value: development
+          - name: PORT_SECUNDARIO
+            value: "3000"
+          - name: PORT
+            valueFrom:
+              configMapKeyRef:
+                name: laa-backend
+                key: PORT
+          - name: NODE_ENV
+            valueFrom:
+              configMapKeyRef:
+                name: laa-backend
+                key: NODE_ENV
+          - name: BBD_URL
+            valueFrom:
+              configMapKeyRef:
+                name: laa-backend
+                key: BBD_URL
+          - name: PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: sc-backend
+                key: PASSWORD
+      imagePullSecrets:
+        - name: docker-registry-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-test
+  namespace: devops
+  labels:
+    app: backend-test
+spec:
+  selector:
+    app: backend-test
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-backend-test
+  namespace: devops
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: backend.test.cl
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: backend-test
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - backend.test.cl
+    secretName: backend-tls
