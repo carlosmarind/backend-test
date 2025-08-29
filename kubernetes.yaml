@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-node-devops
+  namespace: devops
+  labels:
+    app: backend-node-devops
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend-node-devops
+  template:
+    metadata:
+      labels:
+        app: backend-node-devops
+    spec:
+      containers:
+        - name: backend-node-devops
+          image: localhost:8082/backend-node-devops:latest
+          imagePullPolicy: Always
+          env:
+          - name: NODE_ENV_SECUNDARIA
+            value: development
+          - name: PORT_SECUNDARIO
+            value: "3000"
+          - name: PORT
+            valueFrom:
+              configMapKeyRef:
+                name: cm-backend2
+                key: PORT
+          - name: USERNAME
+            valueFrom:
+              configMapKeyRef:
+                name: cm-backend2
+                key: USERNAME
+          - name: API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: sc-backend2
+                key: API_KEY
+      imagePullSecrets:
+        - name: docker-registry-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-node-devops
+  namespace: devops
+  labels: 
+    app: backend-node-devops
+spec:
+  selector:
+    app: backend-node-devops
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-backend-devops
+  namespace: devops
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: backend.devops.cl
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: backend-node-devops
+            port:
+              number: 80
+
+      
+    

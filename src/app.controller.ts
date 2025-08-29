@@ -1,6 +1,5 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { AppService } from './app.service';
-import { Response } from 'express';
 
 @Controller()
 export class AppController {
@@ -17,11 +16,11 @@ export class AppController {
   }
 
   @Get('/validate-rut')
-  validateRut(@Res() res: Response, @Query('rut') rut: string) {
-    const valido = this.appService.validateRut(rut);
-    if (valido) {
-      return res.status(200).json({ mensaje: 'rut valido' });
-    }
-    return res.status(400).json({ mensaje: 'rut invalido' });
+  validateRut(@Query('rut') rut: string) {
+    const esValido = this.appService.validateRut(rut);
+
+    return esValido
+      ? { mensaje: 'rut valido' }
+      : { mensaje: 'rut invalido' };
   }
 }
