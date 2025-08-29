@@ -34,21 +34,16 @@ spec:
               configMapKeyRef:
                 name: laa-backend
                 key: PORT
-          - name: NODE_ENV
+          - name: USERNAME
             valueFrom:
               configMapKeyRef:
-                name: laa-backend
-                key: NODE_ENV
-          - name: BBD_URL
-            valueFrom:
-              configMapKeyRef:
-                name: laa-backend
-                key: BBD_URL
-          - name: PASSWORD
+                name: laa-backend-2
+                key: USERNAME
+          - name: API_KEY
             valueFrom:
               secretKeyRef:
-                name: sc-backend
-                key: PASSWORD
+                name: sc-backend-2
+                key: API_KEY
       imagePullSecrets:
         - name: docker-registry-secret
 ---
