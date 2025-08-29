@@ -77,7 +77,7 @@ pipeline {
         }
         stage('Despliegue continuo') {
             when{
-                branch 'main'
+                branch 'tarea-final'
             }
             agent{
                 docker{
