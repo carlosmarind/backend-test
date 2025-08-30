@@ -40,9 +40,9 @@ describe('AppController', () => {
 
   describe('Pruebas unitarias', () => {
 
-    test('getHello() debería llamar a appService.getHello() y retornar "Hello !!"', () => {
+    test('getHello() debería llamar a appService.getHello() y retornar "Hello World!"', () => {
  
-      expect(appController.getHello()).toBe('Hello !!');
+      expect(appController.getHello()).toBe('Hello World!');
 
       expect(appService.getHello).toHaveBeenCalled();
     });
