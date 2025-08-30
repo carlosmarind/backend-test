@@ -36,6 +36,9 @@ pipeline {
                     docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
                         sh "docker push cmilabaca/backend-test:${BUILD_NUMBER}"
                     }
+                    docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
+                        sh "docker push localhost:8082/backend-test:${BUILD_NUMBER}"
+                    }
                 }
             }
          }
