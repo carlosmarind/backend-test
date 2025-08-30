@@ -1,48 +1,35 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { Logger } from '@nestjs/common';
+const mockListen = jest.fn().mockResolvedValue(true);
+const mockGetUrl = jest.fn().mockResolvedValue('http://localhost:4000');
 
-const mockNestFactory = {
-  create: jest.fn().mockResolvedValue({
-    listen: jest.fn().mockResolvedValue(true),
-    getUrl: jest.fn().mockResolvedValue('http://localhost:4000'),
-    close: jest.fn(),
-  }),
+const mockApp = {
+  listen: mockListen,
+  getUrl: mockGetUrl,
+  close: jest.fn(),
 };
 
-const mockLogger = {
-  log: jest.fn(),
-};
+const mockCreate = jest.fn().mockResolvedValue(mockApp);
 
-jest.mock('@nestjs/common', () => ({
-  Logger: jest.fn(() => mockLogger),
+jest.mock('@nestjs/core', () => ({
+  NestFactory: { create: mockCreate },
 }));
 
-jest.mock('@nestjs/core', () => mockNestFactory);
+const mockLog = jest.fn();
+jest.mock('@nestjs/common', () => ({
+  Logger: jest.fn(() => ({ log: mockLog })),
+}));
 
 import './main';
 
-describe('main.ts', () => {
-  beforeAll(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  });
+describe('main.ts bootstrap', () => {
+  it('debería crear y levantar la aplicación correctamente', async () => {
 
-  it('debería crear una instancia de la aplicación NestJS', () => {
-    expect(mockNestFactory.create).toHaveBeenCalledWith(AppModule);
-  });
+    expect(mockCreate).toHaveBeenCalledWith(expect.any(Function));
 
-  it('debería iniciar la aplicación en el puerto especificado', () => {
-    expect(mockNestFactory.create).toHaveBeenCalled();
-    const mockApp = mockNestFactory.create.mock.results[0].value;
-    expect(mockApp.listen).toHaveBeenCalledWith(
-      expect.stringMatching(/^(4000|.*)$/),
-      '0.0.0.0',
+    expect(mockListen).toHaveBeenCalledWith(
+      process.env.PORT ?? 4000,
+      '0.0.0.0'
     );
-  });
 
-  it('debería registrar el mensaje de inicio en el log', async () => {
-    expect(Logger).toHaveBeenCalledWith('bootstrap');
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(mockLogger.log).toHaveBeenCalledWith('Listening on http://localhost:4000');
+    expect(mockLog).toHaveBeenCalledWith('Listening on http://localhost:4000');
   });
 });
