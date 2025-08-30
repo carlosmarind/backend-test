@@ -53,7 +53,7 @@ describe('OperacionesController (e2e)', () => {
       .get('/operaciones')
       .query({ operacion: 'potencia', a: 2, b: 3 })
       .expect(502)
-      .expect({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+      .expect({ resultado: null, mensaje: 'operacion no pudo ser calculada' });
   });
 -
   it('GET /operaciones división por cero debería retornar un estado 502', () => {
@@ -61,7 +61,7 @@ describe('OperacionesController (e2e)', () => {
       .get('/operaciones')
       .query({ operacion: 'division', a: 10, b: 0 })
       .expect(502)
-      .expect({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+      .expect({ resultado: null, mensaje: 'operacion no pudo ser calculada' });
   });
 
   it('GET /operaciones con parámetro faltante debería retornar un estado 502', () => {
@@ -69,7 +69,7 @@ describe('OperacionesController (e2e)', () => {
       .get('/operaciones')
       .query({ operacion: 'suma', a: 10 })
       .expect(502)
-      .expect({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+      .expect({ resultado: null, mensaje: 'operacion no pudo ser calculada' });
   });
 
   it('GET /operaciones con parámetro no numérico debería retornar un estado 502', () => {
@@ -77,7 +77,7 @@ describe('OperacionesController (e2e)', () => {
       .get('/operaciones')
       .query({ operacion: 'suma', a: 'hola', b: 5 })
       .expect(502)
-      .expect({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+      .expect({ resultado: null, mensaje: 'operacion no pudo ser calculada' });
   });
 
   it('GET /operaciones con operación en mayúsculas debería retornar un estado 502', () => {
@@ -85,7 +85,7 @@ describe('OperacionesController (e2e)', () => {
       .get('/operaciones')
       .query({ operacion: 'Suma', a: 10, b: 5 })
       .expect(502)
-      .expect({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+      .expect({ resultado: null, mensaje: 'operacion no pudo ser calculada' });
   });
 
   it('GET /operaciones con valores negativos y decimales debería retornar resultados correctos', () => {
