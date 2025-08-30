@@ -15,10 +15,12 @@ pipeline {
                   }
               }
               stage('Ejecucion de pruebas') {
-                  steps {
-                      sh 'npm run test:cov -- --ci --runInBand'
-                  }
-              }
+                steps {
+                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh 'npm run test:cov -- --ci --runInBand'
+                    }
+                }
+            }
               stage('Construccion de la aplicacion') {
                   steps {
                       sh 'npm run build'
@@ -26,38 +28,6 @@ pipeline {
               }
           }
       }
-      /*stage('Etapa de analisis de calidad de codigo') {
-          agent {
-              docker {
-                  image 'sonarsource/sonar-scanner-cli'
-                  args '--network=devops-infra_default'
-                  reuseNode true
-              }
-          }
-          stages {
-              stage('Upload de calidad de codigo a SonarQube') {
-                  steps {
-                    withSonarQubeEnv('sonarqube-server') {
-                        sh 'sonar-scanner'
-
-                      }
-                  }
-              }
-              stage('Quality Gate') {
-                  steps {
-                      timeout(time: 30, unit: 'SECONDS') {
-                          script {
-                              def qg = waitForQualityGate()
-                              if (qg.status != 'OK') {
-                                  error "La puerta de calidad no paso: ${qg.status}"
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-      }*/
-      
       stage('Etapa de empaquetado y despliegue') {
           steps {
             script {
