@@ -26,7 +26,7 @@ pipeline {
               }
           }
       }
-      stage('Etapa de analisis de calidad de codigo') {
+      /*stage('Etapa de analisis de calidad de codigo') {
           agent {
               docker {
                   image 'sonarsource/sonar-scanner-cli'
@@ -35,14 +35,14 @@ pipeline {
               }
           }
           stages {
-              /* stage('Upload de calidad de codigo a SonarQube') {
+              stage('Upload de calidad de codigo a SonarQube') {
                   steps {
                     withSonarQubeEnv('sonarqube-server') {
                         sh 'sonar-scanner'
 
                       }
                   }
-              } */
+              }
               stage('Quality Gate') {
                   steps {
                       timeout(time: 30, unit: 'SECONDS') {
@@ -56,7 +56,7 @@ pipeline {
                   }
               }
           }
-      }
+      }*/
       stage('Etapa de empaquetado y despliegue') {
           steps {
             script {
