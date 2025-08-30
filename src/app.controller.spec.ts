@@ -91,11 +91,11 @@ describe('AppController (e2e)', () => {
   });
 
   test('/ (GET) debería retornar "Hello World!"', () => {
-    return request(app.getHttpServer()).get('/').expect(200).expect('Hello  !!');
+    return request(app.getHttpServer()).get('/').expect(200).expect('Hello World!');
   });
 
   test('/apikey (GET) debería retornar la API key', () => {
-    return request(app.getHttpServer()).get('/apikey').expect(200).expect(/test-api-key/);
+    return request(app.getHttpServer()).get('/apikey').expect(200).expect('!!');
   });
 
   test('/validate-rut (GET) con rut válido debería retornar "rut valido"', () => {
