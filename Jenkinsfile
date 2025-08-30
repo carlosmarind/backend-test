@@ -28,6 +28,37 @@ pipeline {
               }
           }
       }
+        stage('Etapa de analisis de calidad de codigo') {
+          agent {
+              docker {
+                  image 'sonarsource/sonar-scanner-cli'
+                  args '--network=devops-infra_default'
+                  reuseNode true
+              }
+          }
+          stages {
+              stage('Upload de calidad de codigo a SonarQube') {
+                  steps {
+                    withSonarQubeEnv('sonarqube-server') {
+                        sh 'sonar-scanner'
+
+                      }
+                  }
+              }
+              stage('Quality Gate') {
+                  steps {
+                      timeout(time: 30, unit: 'SECONDS') {
+                          script {
+                              def qg = waitForQualityGate()
+                              if (qg.status != 'OK') {
+                                  error "La puerta de calidad no paso: ${qg.status}"
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }*/
       stage('Etapa de empaquetado y despliegue') {
           steps {
             script {
@@ -36,10 +67,10 @@ pipeline {
                     sh 'docker tag backend-test:crl crojasalvear/backend-test:crl'
                     sh 'docker push crojasalvear/backend-test:crl'
                 }
-                docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
+                /* docker.withRegistry('http://localhost:8082', 'nexus-credentials') {
                     sh 'docker tag backend-test:latest localhost:8082/backend-test:latest'
                     sh 'docker push localhost:8082/backend-test:latest'
-                }
+                } */
             }
           }
       }

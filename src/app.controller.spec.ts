@@ -15,6 +15,12 @@ describe('AppController', () => {
   beforeEach(async () => {
 
     const app: TestingModule = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          load: [configuration],
+        }),
+      ],
       controllers: [AppController],
       // Se crea un mock de AppService para aislar las pruebas del controlador.
       providers: [
@@ -33,13 +39,12 @@ describe('AppController', () => {
     appService = app.get<AppService>(AppService);
   });
 
-  // Pruebas unitarias para el controlador, aislando el servicio.
   describe('Pruebas unitarias', () => {
 
     test('getHello() debería llamar a appService.getHello() y retornar "Hello World!"', () => {
-      // expect() comprueba el valor de retorno del método.
+ 
       expect(appController.getHello()).toBe('Hello World!');
-      // toHaveBeenCalled() verifica si el método del mock fue llamado.
+
       expect(appService.getHello).toHaveBeenCalled();
     });
 
@@ -49,14 +54,14 @@ describe('AppController', () => {
     });
 
     test('validateRut() debería retornar un objeto con "rut valido" si el rut es válido', async () => {
-      // Se utiliza mockRes para simular la respuesta HTTP.
+    
       const mockRes = {
         status: jest.fn(() => mockRes),
         json: jest.fn(),
       };
-      // Se llama al método del controlador con un RUT de prueba.
+     
       await appController.validateRut(mockRes as any, '11.111.111-1');
-      // Se comprueba que el status y el JSON de la respuesta son los esperados.
+      
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({ mensaje: 'rut valido' });
     });
@@ -74,23 +79,19 @@ describe('AppController', () => {
   });
 });
 
-// describe() para las pruebas end-to-end (e2e).
 describe('AppController (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    // Se crea un módulo de NestJS con el AppModule completo.
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
-    // Se inicializa la aplicación para realizar peticiones reales.
     app = moduleFixture.createNestApplication();
     await app.init();
   });
 
   test('/ (GET) debería retornar "Hello World!"', () => {
-    // request() de supertest simula peticiones HTTP.
     return request(app.getHttpServer()).get('/').expect(200).expect('Hello !!');
   });
 
