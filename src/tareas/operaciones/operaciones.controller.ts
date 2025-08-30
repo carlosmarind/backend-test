@@ -13,7 +13,7 @@ export class OperacionesController {
     @Query('a') a: number,
     @Query('b') b: number,
   ) {
-    const calculo = this.operService.operar(operacion, +a, +b);
+    const calculo = this.operService.operar(+a, +b, operacion);
 
     if (calculo) {
       return res
