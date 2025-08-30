@@ -44,5 +44,9 @@ describe('OperacionesService', () => {
     it('debería retornar undefined para una operación no válida', () => {
       expect(service.operar('potencia', 2, 3)).toBeUndefined();
     });
+
+    it('debería retornar undefined si no se pasa operación (usa valor por defecto)', () => {
+      expect(service.operar(undefined as any, 2, 3)).toBeUndefined();
+    });
   });
 });
