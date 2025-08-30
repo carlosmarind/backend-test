@@ -22,7 +22,6 @@ describe('AppController', () => {
         }),
       ],
       controllers: [AppController],
-      // Se crea un mock de AppService para aislar las pruebas del controlador.
       providers: [
         {
           provide: AppService,
@@ -41,9 +40,9 @@ describe('AppController', () => {
 
   describe('Pruebas unitarias', () => {
 
-    test('getHello() debería llamar a appService.getHello() y retornar "Hello World!"', () => {
+    test('getHello() debería llamar a appService.getHello() y retornar "Hello !!"', () => {
  
-      expect(appController.getHello()).toBe('Hello World!');
+      expect(appController.getHello()).toBe('Hello !!');
 
       expect(appService.getHello).toHaveBeenCalled();
     });
