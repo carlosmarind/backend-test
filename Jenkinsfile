@@ -26,7 +26,25 @@ pipeline {
                 }
             }
         }
-         stage('2. Packaging and delivery stage') {
+        stage('2. Quality Assurance') {
+            agent{
+                docker{
+                    image 'sonarsource/sonar-scanner-cli'
+                    args '--network=devops-infra_default'
+                    reuseNode true
+                }
+            }
+            stages{
+                stage('Upload de codigo a sonarqube') {
+                    steps{
+                        withSonarQubeEnv('SonarQube') {
+                            sh 'sonar-scanner'
+                        }
+                    }
+                }
+            }
+        }
+         stage('3. Packaging and delivery stage') {
              steps {
 
                 sh 'docker build -t backend-test:cmd .'
