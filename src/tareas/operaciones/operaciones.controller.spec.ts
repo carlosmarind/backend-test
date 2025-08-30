@@ -22,4 +22,11 @@ describe('AppController (e2e)', () => {
       .query({ operacion: 'suma', a: 10, b: 30 })
       .expect(200);
   });
+
+  it('/operaciones (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/operaciones')
+      .query({ operacion: '', a: 10, b: 30 })
+      .expect(502);
+  });  
 });
