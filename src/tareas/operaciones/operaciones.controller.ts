@@ -4,25 +4,33 @@ import { Response } from 'express';
 
 @Controller('operaciones')
 export class OperacionesController {
-  constructor(private readonly operService: OperacionesService) {}
+  constructor(private readonly operService: OperacionesService) { }
 
   @Get()
-  operar(
+  async operar(
     @Res() res: Response,
     @Query('operacion') operacion: string,
     @Query('a') a: number,
     @Query('b') b: number,
   ) {
-    const calculo = this.operService.operar(operacion, +a, +b);
+    try {
 
-    if (calculo) {
+      const calculo = this.operService.operar(+a, +b, operacion);
+
+      if (!Number.isNaN(calculo) && calculo !== undefined) {
+        return res
+          .status(200)
+          .json({ resultado: calculo, mensaje: 'operación exitosa' });
+      }
+
       return res
-        .status(200)
-        .json({ resultado: calculo, mensaje: 'operacion exitosa' });
-    }
+        .status(502)
+        .json({ resultado: NaN, mensaje: 'operación no pudo ser calculada' });
 
-    return res
-      .status(502)
-      .json({ resultado: NaN, mensaje: 'operacion no pudo ser calculada' });
+    } catch (error){
+      return res
+        .status(422)
+        .json({ resultado: NaN, mensaje: `${error.message}` })
+    }
   }
 }

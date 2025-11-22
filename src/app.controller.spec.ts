@@ -26,11 +26,17 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  describe('Probar el modulo raiz del proyecto', () => {
-    test('Esto deberia retornar hola mundo en ingles"', () => {
-      expect(appController.getHello()).toBe('Hello !!');
+  
+  describe('Probar getters', () => {
+    test('hello', () => {
+      expect(appController.getHello()).toMatch(/!!/);
+    });
+
+    test('apikey', () => {
+      expect(appController.getApikey()).toMatch(/!!/)
     });
   });
+  
 });
 
 describe('AppController (e2e)', () => {
@@ -46,6 +52,45 @@ describe('AppController (e2e)', () => {
   });
 
   it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/').expect(200).expect(/Hello/);
+    return request(app.getHttpServer())
+    .get('/')
+    .expect(200)
+    .expect(/Hello/);
   });
+
+
+  it('/apikey (GET)', () => {
+    return request(app.getHttpServer())
+    .get('/apikey')
+    .expect(200)
+    .expect(/!!/);
+  });
+
+  it('/validate-rut (GET) [OK] ', () => {
+    return request(app.getHttpServer())
+    .get('/validate-rut')
+    .query({ rut: '16.672.890-8' })
+    .expect('Content-type', /application\/json/)
+    .then((res) => {
+        expect(res.body.mensaje).toBe('rut válido');
+        expect(res.status).toBe(200)
+      });
+
+  })
+
+  it('/validate-rut (GET) [Bad Request] ', () => {
+    return request(app.getHttpServer())
+    .get('/validate-rut')
+    .query({ rut: '120.345.678-9' })
+    .expect('Content-type', /application\/json/)
+    .then((res) => {
+        expect(res.body.mensaje).toBe('rut inválido');
+        expect(res.status).toBe(400)
+      });
+
+  })
+
+
+
+
 });

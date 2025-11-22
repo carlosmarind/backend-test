@@ -20,8 +20,8 @@ export class AppController {
   validateRut(@Res() res: Response, @Query('rut') rut: string) {
     const valido = this.appService.validateRut(rut);
     if (valido) {
-      return res.status(200).json({ mensaje: 'rut valido' });
+      return res.status(200).json({ mensaje: 'rut válido' });
     }
-    return res.status(400).json({ mensaje: 'rut invalido' });
+    return res.status(400).json({ mensaje: 'rut inválido' });
   }
 }
