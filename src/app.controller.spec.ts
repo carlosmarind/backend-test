@@ -10,6 +10,7 @@ import configuration from './config/configuration';
 
 describe('AppController', () => {
   let appController: AppController;
+  let appService: AppService;
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
@@ -24,11 +25,46 @@ describe('AppController', () => {
     }).compile();
 
     appController = app.get<AppController>(AppController);
+    appService = app.get<AppService>(AppService);
   });
 
-  describe('Probar el modulo raiz del proyecto', () => {
-    test('Esto deberia retornar hola mundo en ingles"', () => {
-      expect(appController.getHello()).toBe('Hello !!');
+  describe('Pruebas unitarias del AppController', () => {
+    it('getHello debería retornar el saludo del servicio', () => {
+      jest.spyOn(appService, 'getHello').mockReturnValue('Hello Test!!');
+      expect(appController.getHello()).toBe('Hello Test!!');
+    });
+
+    it('getApikey debería devolver el apikey', () => {
+      jest.spyOn(appService, 'getApikey').mockReturnValue('FAKE_API_KEY');
+      expect(appController.getApikey()).toBe('FAKE_API_KEY');
+    });
+
+    it('validateRut debería devolver 200 si el rut es válido', () => {
+      const res: any = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+
+      jest.spyOn(appService, 'validateRut').mockReturnValue(true);
+
+      appController.validateRut(res, '12345678-9');
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({ mensaje: 'rut valido' });
+    });
+
+    it('validateRut debería devolver 400 si el rut es inválido', () => {
+      const res: any = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      };
+
+      jest.spyOn(appService, 'validateRut').mockReturnValue(false);
+
+      appController.validateRut(res, '11111111-1');
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ mensaje: 'rut invalido' });
     });
   });
 });
@@ -47,5 +83,18 @@ describe('AppController (e2e)', () => {
 
   it('/ (GET)', () => {
     return request(app.getHttpServer()).get('/').expect(200).expect(/Hello/);
+  });
+
+  it('/apikey (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/apikey')
+      .expect(200);
+  });
+
+  it('/validate-rut (GET) rut inválido', () => {
+    return request(app.getHttpServer())
+      .get('/validate-rut?rut=11111111-1')
+      .expect(400)
+      .expect({ mensaje: 'rut invalido' });
   });
 });

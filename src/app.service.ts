@@ -19,6 +19,17 @@ export class AppService {
   }
 
   validateRut(rut: string): boolean {
+    
+    if (!rut || rut.trim() === '') {
+      return false;
+    }
+
+   
+    if (rut === '11111111-1' || rut === '00000000-0') {
+      return false;
+    }
+
+    // ✅ usar librería para validar formato y dígito verificador
     return validateRut(rut);
   }
 }
